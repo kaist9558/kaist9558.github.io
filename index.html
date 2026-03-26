@@ -1,37 +1,461 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jo's Personal Website</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jo | Personal Website</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0b1020;
+      --bg-soft: #121933;
+      --card: rgba(255, 255, 255, 0.08);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --text: #f5f7fb;
+      --muted: #b8c0d4;
+      --accent: #6ea8fe;
+      --accent-2: #8ef0d2;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 20px;
-      line-height: 1.6;
-      background: #f7f7f7;
-      color: #222;
+      margin: 0;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(110, 168, 254, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(142, 240, 210, 0.14), transparent 24%),
+        linear-gradient(180deg, #0a0f1e 0%, #11182f 100%);
+      color: var(--text);
+      line-height: 1.7;
     }
-    .card {
-      background: white;
-      padding: 30px;
+
+    .container {
+      width: min(1120px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(14px);
+      background: rgba(10, 15, 30, 0.55);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 0;
+    }
+
+    .brand {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .brand span {
+      color: var(--accent);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    .hero {
+      padding: 96px 0 72px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    .hero-main,
+    .hero-side,
+    .section-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-main {
+      padding: 42px;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(110, 168, 254, 0.12);
+      color: #dbe7ff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 5vw, 4.5rem);
+      line-height: 1.08;
+      margin: 0 0 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-main p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 1.06rem;
+      max-width: 680px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 13px 20px;
       border-radius: 14px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      text-decoration: none;
+      font-weight: 700;
+      transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
     }
-    h1 { margin-top: 0; }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      opacity: 0.96;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8c8cff);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .hero-side {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .mini-label {
+      color: var(--muted);
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .metric {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .sections {
+      padding: 0 0 80px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .section-card {
+      padding: 34px;
+    }
+
+    .section-title {
+      margin: 0 0 18px;
+      font-size: 1.45rem;
+      letter-spacing: -0.02em;
+    }
+
+    .section-text {
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .info-box {
+      padding: 20px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .info-box h3 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .info-box p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .timeline-item {
+      padding: 18px 20px;
+      border-left: 3px solid var(--accent);
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 0 16px 16px 0;
+    }
+
+    .timeline-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .timeline-item p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .contact-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .contact-item {
+      padding: 20px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .contact-item a {
+      color: var(--accent-2);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .footer {
+      padding: 0 0 44px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      text-align: center;
+    }
+
+    @media (max-width: 920px) {
+      .hero-grid,
+      .info-grid,
+      .contact-box {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        padding-top: 64px;
+      }
+
+      .hero-main,
+      .hero-side,
+      .section-card {
+        padding: 24px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Hello, I'm Jo</h1>
-    <p>Welcome to my personal website built with GitHub Pages.</p>
-    <p>This website is part of my class assignment.</p>
-    <h2>About Me</h2>
-    <p>I am interested in AI, research, and learning new technologies.</p>
-    <h2>Contact</h2>
-    <p>Email: your-email@example.com</p>
-  </div>
+  <header class="nav">
+    <div class="container nav-inner">
+      <div class="brand">JO<span>.</span></div>
+      <nav class="nav-links">
+        <a href="#about">About</a>
+        <a href="#learning">Learning</a>
+        <a href="#project">Project</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-main">
+          <div class="eyebrow">Personal Website · GitHub Pages</div>
+          <h1>Hello, I'm Jo.</h1>
+          <p>
+            I built this website as part of my class assignment using GitHub Pages
+            and AI-assisted learning.
+          </p>
+          <p>
+            This project helped me understand how GitHub works, how websites can
+            be deployed online, and how AI can support step-by-step learning when
+            facing an unfamiliar technical task.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#project">View Project</a>
+            <a class="btn btn-secondary" href="#contact">Contact Me</a>
+          </div>
+        </div>
+
+        <aside class="hero-side">
+          <div class="metric">
+            <div class="mini-label">Project Focus</div>
+            <strong>GitHub Pages</strong>
+            <span>Building and publishing a personal website online</span>
+          </div>
+          <div class="metric">
+            <div class="mini-label">Learning Theme</div>
+            <strong>AI-Assisted Learning</strong>
+            <span>Breaking a difficult task into smaller, practical steps</span>
+          </div>
+          <div class="metric">
+            <div class="mini-label">Keywords</div>
+            <strong>GitHub · HTML · Reflection</strong>
+            <span>Practice, iteration, and learning by doing</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="about" class="sections">
+      <div class="section-card">
+        <h2 class="section-title">About Me</h2>
+        <p class="section-text">
+          I am interested in AI, research, and learning new technologies.
+          This website is a simple but meaningful first step in understanding
+          how technical tools can be used to share work online.
+        </p>
+
+        <div class="info-grid">
+          <div class="info-box">
+            <h3>Interests</h3>
+            <p>AI, technology, research, and continuous learning.</p>
+          </div>
+          <div class="info-box">
+            <h3>Goal</h3>
+            <p>To learn unfamiliar tools through direct practice rather than only theory.</p>
+          </div>
+          <div class="info-box">
+            <h3>Approach</h3>
+            <p>Start simple, test quickly, revise clearly, and improve step by step.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="learning" class="section-card">
+        <h2 class="section-title">What I Learned</h2>
+        <p class="section-text">
+          Through this project, I learned that GitHub is more than a place to store code.
+          It is a platform for organizing files, tracking changes, and collaborating with others.
+          I also learned that GitHub Pages makes it possible to publish a website directly from a repository.
+        </p>
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <strong>1. Understand the basic structure</strong>
+            <p>I first learned the difference between GitHub, repositories, and GitHub Pages.</p>
+          </div>
+          <div class="timeline-item">
+            <strong>2. Build a minimal working version</strong>
+            <p>I focused on making the site work first before trying to improve the design.</p>
+          </div>
+          <div class="timeline-item">
+            <strong>3. Improve through iteration</strong>
+            <p>After the basic page worked, I refined the layout, text, and overall presentation.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="project" class="section-card">
+        <h2 class="section-title">Project Reflection</h2>
+        <p class="section-text">
+          The most effective strategy was dividing the task into small steps.
+          Instead of trying to understand everything at once, I learned one concept at a time:
+          repository creation, file editing, publishing, and revision.
+        </p>
+        <p class="section-text">
+          What worked well was using AI to explain unfamiliar terms and generate a starting structure.
+          What did not work well was trying to make the page perfect from the beginning.
+          I found that simplicity and gradual improvement were much more effective.
+        </p>
+      </div>
+
+      <div id="contact" class="section-card">
+        <h2 class="section-title">Contact</h2>
+        <p class="section-text">
+          You can reach me through the information below.
+        </p>
+
+        <div class="contact-box">
+          <div class="contact-item">
+            <div class="mini-label">Email</div>
+            <a href="mailto:kyungjae.jo@kaist.ac.kr">your-email@example.com</a>
+          </div>
+          <div class="contact-item">
+            <div class="mini-label">GitHub</div>
+            <a href="https://github.com/yourgithubid" target="_blank">github.com/kaist9558.github.io</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      © 2026 Jo. Built with GitHub Pages.
+    </footer>
+  </main>
 </body>
 </html>
