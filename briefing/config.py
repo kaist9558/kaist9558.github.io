@@ -97,13 +97,6 @@ CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "1024"))
 
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", "")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
-EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER", "")
-
-
 def ensure_dirs() -> None:
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     HIKOREA_FILE_DIR.mkdir(parents=True, exist_ok=True)

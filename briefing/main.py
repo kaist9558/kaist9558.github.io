@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from . import hikorea, mailer, scraper, storage, summarizer  # noqa: E402
+from . import hikorea, publisher, scraper, storage, summarizer  # noqa: E402
 from .config import ensure_dirs  # noqa: E402
 
 logging.basicConfig(
@@ -22,7 +22,7 @@ log = logging.getLogger("briefing")
 def run(*, dry_run: bool = False) -> int:
     ensure_dirs()
 
-    article_briefings: list[mailer.ArticleBriefing] = []
+    article_briefings: list[publisher.ArticleBriefing] = []
     seen_urls: set[tuple[str, str]] = set()
 
     log.info("Step 1/3: scraping press releases")
@@ -42,7 +42,7 @@ def run(*, dry_run: bool = False) -> int:
                 continue
 
             article_briefings.append(
-                mailer.ArticleBriefing(
+                publisher.ArticleBriefing(
                     site=art.site,
                     title=art.title,
                     url=art.url,
@@ -52,7 +52,7 @@ def run(*, dry_run: bool = False) -> int:
             )
 
         log.info("Step 2/3: monitoring HiKorea attachments")
-        hikorea_briefings: list[mailer.HikoreaBriefing] = []
+        hikorea_briefings: list[publisher.HikoreaBriefing] = []
         changes = hikorea.check_all(conn)
         log.info("  detected %d file changes", len(changes))
 
@@ -63,7 +63,7 @@ def run(*, dry_run: bool = False) -> int:
                 new_text=ch.new_text,
             )
             hikorea_briefings.append(
-                mailer.HikoreaBriefing(
+                publisher.HikoreaBriefing(
                     target_label=ch.target_label,
                     file_name=ch.file_name,
                     page_url=ch.page_url,
@@ -73,32 +73,38 @@ def run(*, dry_run: bool = False) -> int:
             )
 
     log.info(
-        "Step 3/3: rendering email (articles=%d, hikorea=%d)",
+        "Step 3/3: publishing GitHub Issue (articles=%d, hikorea=%d)",
         len(article_briefings),
         len(hikorea_briefings),
     )
     if not article_briefings and not hikorea_briefings:
-        log.info("No new updates today. Sending empty briefing anyway for reassurance.")
+        log.info("새 업데이트가 없지만, 모니터링 정상 동작 확인용으로 빈 브리핑을 게시합니다.")
 
-    subject, body_text, body_html = mailer.render_email(
+    if dry_run:
+        title, body = publisher.render_markdown(
+            articles=article_briefings,
+            hikorea_changes=hikorea_briefings,
+        )
+        print("=" * 60)
+        print("TITLE:", title)
+        print("=" * 60)
+        print(body)
+        return 0
+
+    ok = publisher.publish(
         articles=article_briefings,
         hikorea_changes=hikorea_briefings,
     )
-
-    if dry_run:
-        print("=" * 60)
-        print("SUBJECT:", subject)
-        print("=" * 60)
-        print(body_text)
-        return 0
-
-    ok = mailer.send(subject, body_text, body_html)
     return 0 if ok else 1
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="이민·비자 정책 일일 브리핑")
-    parser.add_argument("--dry-run", action="store_true", help="이메일 발송 없이 본문만 출력")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="GitHub Issue를 생성하지 않고 본문만 출력",
+    )
     args = parser.parse_args()
     try:
         return run(dry_run=args.dry_run)

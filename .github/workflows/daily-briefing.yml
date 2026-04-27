@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "이메일 발송 없이 본문만 출력"
+        description: "Issue를 생성하지 않고 본문만 출력"
         required: false
         default: "false"
 
@@ -16,7 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -29,13 +30,12 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Restore briefing state cache
-        id: state-cache
         uses: actions/cache@v4
         with:
           path: |
             data/state.sqlite3
             data/hikorea_files
-          # Cache key bumps weekly so we don't grow forever; previous version restored on miss.
+          # Cache key bumps on every run; previous run's cache restored on miss.
           key: briefing-state-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             briefing-state-${{ runner.os }}-
@@ -44,12 +44,9 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
-          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
-          SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '1' }}
+          # GITHUB_REPOSITORY is auto-set by the runner; GITHUB_TOKEN must be passed explicitly.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             python -m briefing.main --dry-run
