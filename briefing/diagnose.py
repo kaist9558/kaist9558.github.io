@@ -3,16 +3,22 @@
 GitHub Actions에서 `python -m briefing.diagnose` 로 호출하면 각 사이트의
 응답 구조를 분석해서 stdout에 출력합니다. 출력 결과를 보면 어떤 CSS
 셀렉터가 매칭되는지, 어떤 wrapping 컨테이너가 후보인지 한눈에 보입니다.
+
+또한 렌더된 HTML을 `data/diagnose/{site}.html` 로 저장하므로, 로그만으로
+판단이 안 될 때는 워크플로우 artifact에서 받아 직접 분석할 수 있습니다.
 """
 from __future__ import annotations
 
 import logging
+import re
 import sys
 
 from bs4 import BeautifulSoup
 
-from .config import SITES, Site
+from .config import STORAGE_DIR, SITES, Site
 from .http_client import get, make_session
+
+DUMP_DIR = STORAGE_DIR / "diagnose"
 
 logging.basicConfig(level="INFO", format="%(message)s")
 log = logging.getLogger("diagnose")
@@ -70,6 +76,16 @@ def inspect_site(session, site: Site, js_renderer=None) -> None:
         if res.headers.get("content-type"):
             print(f"Content-Type: {res.headers['content-type']}")
 
+    # 렌더된 HTML을 artifact로 보관 (로그로 판단 안 될 때 직접 분석용)
+    DUMP_DIR.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^\w가-힣]+", "_", site.name).strip("_")
+    dump_path = DUMP_DIR / f"{slug}.html"
+    try:
+        dump_path.write_text(html, encoding="utf-8")
+        print(f"HTML dump 저장: {dump_path}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"HTML dump 저장 실패: {exc}")
+
     soup = BeautifulSoup(html, "lxml")
 
     page_title = soup.find("title")
@@ -114,8 +130,8 @@ def inspect_site(session, site: Site, js_renderer=None) -> None:
                 print(f"  <{child.name} class={child_cls!r}>: {child_text!r}")
 
     # 3) class/id에 board/bbs/list/tbl 포함된 컨테이너 후보
-    print("\n--- wrapping 컨테이너 후보 (class/id에 board/bbs/list/tbl/article) ---")
-    keywords = ("board", "bbs", "list", "tbl", "article", "notice")
+    print("\n--- wrapping 컨테이너 후보 (class/id에 board/bbs/list/tbl/article/notice/news) ---")
+    keywords = ("board", "bbs", "list", "tbl", "article", "notice", "news", "data", "post", "press")
     seen: set[str] = set()
     for tag in soup.find_all(["table", "div", "ul", "ol", "section"]):
         cls = " ".join(tag.get("class") or [])
@@ -131,6 +147,49 @@ def inspect_site(session, site: Site, js_renderer=None) -> None:
         if child_rows == 0:
             continue
         print(f"  <{tag.name} class={cls!r} id={tid!r}> → 내부 tr/li {child_rows}개")
+
+    # 3.5) 매칭된 후보 셀렉터가 없을 때: 키워드 무관, 모든 큰 리스트 + 첫 자식 미리보기
+    if not matches:
+        print("\n--- top 8 lists by child count (class 무관 fallback) ---")
+        candidates_by_count: list[tuple[int, "Tag"]] = []
+        for tag in soup.find_all(["table", "ul", "ol"]):
+            n = len(tag.find_all(["tr", "li"], recursive=True))
+            if n < 3:
+                continue
+            candidates_by_count.append((n, tag))
+        candidates_by_count.sort(key=lambda x: x[0], reverse=True)
+        for n, tag in candidates_by_count[:8]:
+            cls = " ".join(tag.get("class") or [])
+            tid = tag.get("id") or ""
+            print(f"  <{tag.name} class={cls!r} id={tid!r}> → 자식 {n}개")
+            # 첫 자식의 첫 <a> 미리보기 — article-likeness 판단
+            first_child = tag.find(["tr", "li"])
+            if first_child:
+                link = first_child.select_one("a[href]")
+                if link:
+                    text = link.get_text(" ", strip=True)[:80]
+                    href = link.get("href", "")[:80]
+                    print(f"     첫 a: {text!r}  href={href!r}")
+                else:
+                    text = first_child.get_text(" ", strip=True)[:80]
+                    print(f"     첫 자식: {text!r} (a 없음)")
+
+        # 추가: 페이지에 보이는 모든 <a> 중 의심스러운 글-링크 패턴 통계
+        print("\n--- '보도자료스러운' 링크 패턴 ---")
+        article_link_patterns = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            text = a.get_text(" ", strip=True)
+            if not text or len(text) < 10:
+                continue
+            href_l = href.lower()
+            if any(p in href_l for p in ("artcl", "view.do", "detail", "view?", "boarddetail", "noticeview", "bbsdetail")):
+                article_link_patterns.append((href[:90], text[:80]))
+        for href, text in article_link_patterns[:8]:
+            print(f"  href={href!r}")
+            print(f"    text: {text!r}")
+        if not article_link_patterns:
+            print("  (의심스러운 글-링크 패턴 없음)")
 
     # 4) 본문 추출 시도 — 셀렉터 첫 후보로 첫 글의 상세페이지에 접속해 본문 컨테이너 후보 보고
     if matches:

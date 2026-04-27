@@ -84,5 +84,6 @@ jobs:
           path: |
             data/state.sqlite3
             data/hikorea_files/
+            data/diagnose/
           retention-days: 30
           if-no-files-found: ignore
