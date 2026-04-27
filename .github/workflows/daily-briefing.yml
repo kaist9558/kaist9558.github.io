@@ -2,8 +2,9 @@ name: Daily Immigration Policy Briefing
 
 on:
   schedule:
-    # 한국시간 매일 오전 8시 = UTC 23시 (전날)
-    - cron: "0 23 * * *"
+    # 한국시간 매일 09:40 = UTC 00:40
+    # 윈도우: 어제 09:30 KST ~ 오늘 09:30 KST (실행 10분 전에 종료)
+    - cron: "40 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -44,7 +45,9 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
-          LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '1' }}
+          WINDOW_HOURS: ${{ vars.WINDOW_HOURS || '24' }}
+          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '9' }}
+          WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '30' }}
           # GITHUB_REPOSITORY is auto-set by the runner; GITHUB_TOKEN must be passed explicitly.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Iterable
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 
-from .config import KEYWORDS, KST, LOOKBACK_DAYS, SITES, Site
+from .config import KEYWORDS, KST, SITES, Site, compute_window
 from .http_client import get, make_session
 
 log = logging.getLogger(__name__)
@@ -100,7 +100,12 @@ def fetch_articles(
         return []
 
     articles: list[Article] = []
-    cutoff = datetime.now(KST) - timedelta(days=LOOKBACK_DAYS)
+    window_start, window_end = compute_window()
+    # 보도자료는 일 단위 날짜만 제공되므로 date() 비교.
+    # 윈도우가 [어제 09:30, 오늘 09:30) 라면 어제·오늘 두 날짜의 글을 모두 후보로 본다.
+    # (오늘 09:30 이후 글이 함께 들어올 수 있으나, dedup 테이블이 다음 실행에서 중복 발송을 막음.)
+    earliest_date = window_start.date()
+    latest_date = window_end.date()
 
     for row in rows[:max_rows]:
         link = _select_first(row, site.title_link_selector)
@@ -117,8 +122,10 @@ def fetch_articles(
         url = urljoin(site.base_url + "/", href)
 
         published = _extract_date(row, site.date_selector)
-        if published and published < cutoff:
-            continue
+        if published:
+            d = published.date()
+            if d < earliest_date or d > latest_date:
+                continue
 
         if not _matches_keyword(title):
             continue

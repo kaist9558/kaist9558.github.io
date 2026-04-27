@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -18,7 +19,27 @@ KEYWORDS: tuple[str, ...] = (
     "전자여행허가", "K-ETA", "재외동포",
 )
 
-LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "1"))
+# 브리핑 윈도우: 매일 [어제 09:30 KST, 오늘 09:30 KST) 24시간 구간을 센싱.
+# 워크플로우는 09:40 KST에 실행되어 윈도우 종료 10분 후 게시.
+WINDOW_HOURS = int(os.getenv("WINDOW_HOURS", "24"))
+WINDOW_END_HOUR_KST = int(os.getenv("WINDOW_END_HOUR_KST", "9"))
+WINDOW_END_MINUTE_KST = int(os.getenv("WINDOW_END_MINUTE_KST", "30"))
+
+
+def compute_window(now: datetime | None = None) -> tuple[datetime, datetime]:
+    """브리핑 시간 윈도우 (start, end) — 둘 다 KST tz-aware."""
+    now = now or datetime.now(KST)
+    end = now.replace(
+        hour=WINDOW_END_HOUR_KST,
+        minute=WINDOW_END_MINUTE_KST,
+        second=0,
+        microsecond=0,
+    )
+    if end > now:
+        # 오늘의 종료 시각이 아직 안 지났으면 어제 종료 시각으로
+        end -= timedelta(days=1)
+    start = end - timedelta(hours=WINDOW_HOURS)
+    return start, end
 
 REQUEST_TIMEOUT = 15
 REQUEST_RETRIES = 3
