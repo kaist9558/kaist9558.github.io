@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Iterable
 from urllib.parse import urljoin
@@ -26,6 +26,20 @@ class Article:
     content: str
 
 
+@dataclass
+class ScrapeResult:
+    articles: list[Article] = field(default_factory=list)
+    # 키워드는 못 맞췄지만 윈도우엔 들어온 후보들 — 키워드 후보 추천에 사용.
+    unmatched_candidates: list[tuple[str, str, str]] = field(default_factory=list)
+    # ("법무부", "HTTP 503"), ("출입국·외국인정책본부", "no rows matched selectors") 등.
+    errors: list[tuple[str, str]] = field(default_factory=list)
+
+    def extend(self, other: "ScrapeResult") -> None:
+        self.articles.extend(other.articles)
+        self.unmatched_candidates.extend(other.unmatched_candidates)
+        self.errors.extend(other.errors)
+
+
 def _select_first(node: Tag, selector: str) -> Tag | None:
     for sel in (s.strip() for s in selector.split(",")):
         if not sel:
@@ -41,7 +55,6 @@ def _extract_date(node: Tag, selector: str | None) -> datetime | None:
         return None
     cell = _select_first(node, selector)
     if not cell:
-        # Fall back: scan all <td> for a date-shaped string.
         for td in node.find_all(["td", "span", "div"]):
             m = DATE_RE.search(td.get_text(" ", strip=True))
             if m:
@@ -73,21 +86,21 @@ def _extract_content(soup: BeautifulSoup, selector: str) -> str:
             text = node.get_text("\n", strip=True)
             if text:
                 return text
-    # Last resort: strip nav/footer/script then dump body text.
     for tag in soup.find_all(["script", "style", "nav", "header", "footer", "aside"]):
         tag.decompose()
     body = soup.find("body")
     return body.get_text("\n", strip=True) if body else ""
 
 
-def fetch_articles(
-    session, site: Site, *, max_rows: int = 15
-) -> list[Article]:
+def fetch_articles(session, site: Site, *, max_rows: int = 15) -> ScrapeResult:
+    result = ScrapeResult()
+
     res = get(session, site.list_url, encoding=site.encoding)
     if res is None:
-        return []
-    soup = BeautifulSoup(res.text, "lxml")
+        result.errors.append((site.name, "목록 페이지 접속 실패 (네트워크 또는 5xx)"))
+        return result
 
+    soup = BeautifulSoup(res.text, "lxml")
     rows: list[Tag] = []
     for sel in (s.strip() for s in site.row_selector.split(",")):
         if not sel:
@@ -96,14 +109,12 @@ def fetch_articles(
         if rows:
             break
     if not rows:
-        log.warning("[%s] no rows matched selectors on %s", site.name, site.list_url)
-        return []
+        msg = "목록 셀렉터 매칭 실패 — 사이트 구조가 변경됐을 가능성 (config.py의 row_selector 확인)"
+        log.warning("[%s] %s", site.name, msg)
+        result.errors.append((site.name, msg))
+        return result
 
-    articles: list[Article] = []
     window_start, window_end = compute_window()
-    # 보도자료는 일 단위 날짜만 제공되므로 date() 비교.
-    # 윈도우가 [어제 09:30, 오늘 09:30) 라면 어제·오늘 두 날짜의 글을 모두 후보로 본다.
-    # (오늘 09:30 이후 글이 함께 들어올 수 있으나, dedup 테이블이 다음 실행에서 중복 발송을 막음.)
     earliest_date = window_start.date()
     latest_date = window_end.date()
 
@@ -117,7 +128,6 @@ def fetch_articles(
 
         href = link["href"]
         if href.lower().startswith("javascript:"):
-            # Skip JS-only links — site likely needs a headless browser.
             continue
         url = urljoin(site.base_url + "/", href)
 
@@ -128,16 +138,16 @@ def fetch_articles(
                 continue
 
         if not _matches_keyword(title):
+            result.unmatched_candidates.append((site.name, title, url))
             continue
 
         detail_res = get(session, url, encoding=site.encoding)
         content = ""
         if detail_res is not None:
             detail_soup = BeautifulSoup(detail_res.text, "lxml")
-            content = _extract_content(detail_soup, site.detail_content_selector)
-            content = content[:4000]
+            content = _extract_content(detail_soup, site.detail_content_selector)[:4000]
 
-        articles.append(
+        result.articles.append(
             Article(
                 site=site.name,
                 title=title,
@@ -147,15 +157,16 @@ def fetch_articles(
             )
         )
 
-    return articles
+    return result
 
 
-def fetch_all(sites: Iterable[Site] = SITES) -> list[Article]:
+def fetch_all(sites: Iterable[Site] = SITES) -> ScrapeResult:
     session = make_session()
-    out: list[Article] = []
+    combined = ScrapeResult()
     for site in sites:
         try:
-            out.extend(fetch_articles(session, site))
-        except Exception:  # noqa: BLE001 - one site shouldn't kill the run
+            combined.extend(fetch_articles(session, site))
+        except Exception as exc:  # noqa: BLE001 - one site shouldn't kill the run
             log.exception("[%s] scrape failed", site.name)
-    return out
+            combined.errors.append((site.name, f"예외 발생: {type(exc).__name__}: {exc}"))
+    return combined

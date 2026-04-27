@@ -48,6 +48,7 @@ jobs:
           WINDOW_HOURS: ${{ vars.WINDOW_HOURS || '24' }}
           WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '9' }}
           WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '30' }}
+          ISSUE_KEEP_DAYS: ${{ vars.ISSUE_KEEP_DAYS || '30' }}
           # GITHUB_REPOSITORY is auto-set by the runner; GITHUB_TOKEN must be passed explicitly.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

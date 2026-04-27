@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from . import hikorea, publisher, scraper, storage, summarizer  # noqa: E402
+from . import cleanup, hikorea, publisher, scraper, storage, summarizer  # noqa: E402
 from .config import ensure_dirs  # noqa: E402
 
 logging.basicConfig(
@@ -25,12 +25,17 @@ def run(*, dry_run: bool = False) -> int:
     article_briefings: list[publisher.ArticleBriefing] = []
     seen_urls: set[tuple[str, str]] = set()
 
-    log.info("Step 1/3: scraping press releases")
-    articles = scraper.fetch_all()
-    log.info("  fetched %d candidate articles (after keyword filter)", len(articles))
+    log.info("Step 1/4: scraping press releases")
+    scrape_result = scraper.fetch_all()
+    log.info(
+        "  fetched %d matched / %d unmatched candidates / %d errors",
+        len(scrape_result.articles),
+        len(scrape_result.unmatched_candidates),
+        len(scrape_result.errors),
+    )
 
     with storage.connect() as conn:
-        for art in articles:
+        for art in scrape_result.articles:
             key = (art.site, art.url)
             if key in seen_urls or storage.is_article_seen(conn, art.site, art.url):
                 continue
@@ -51,7 +56,7 @@ def run(*, dry_run: bool = False) -> int:
                 )
             )
 
-        log.info("Step 2/3: monitoring HiKorea attachments")
+        log.info("Step 2/4: monitoring HiKorea attachments")
         hikorea_briefings: list[publisher.HikoreaBriefing] = []
         changes = hikorea.check_all(conn)
         log.info("  detected %d file changes", len(changes))
@@ -72,18 +77,32 @@ def run(*, dry_run: bool = False) -> int:
                 )
             )
 
+    log.info("Step 3/4: scanning unmatched titles for keyword candidates")
+    keyword_candidates_md = ""
+    if scrape_result.unmatched_candidates:
+        keyword_candidates_md = summarizer.suggest_keywords(
+            scrape_result.unmatched_candidates
+        )
+        log.info(
+            "  keyword suggestions: %s",
+            "found" if keyword_candidates_md else "none",
+        )
+
     log.info(
-        "Step 3/3: publishing GitHub Issue (articles=%d, hikorea=%d)",
+        "Step 4/4: publishing GitHub Issue (articles=%d, hikorea=%d, errors=%d, candidates=%s)",
         len(article_briefings),
         len(hikorea_briefings),
+        len(scrape_result.errors),
+        "yes" if keyword_candidates_md else "no",
     )
-    if not article_briefings and not hikorea_briefings:
-        log.info("새 업데이트가 없지만, 모니터링 정상 동작 확인용으로 빈 브리핑을 게시합니다.")
 
     if dry_run:
         title, body = publisher.render_markdown(
             articles=article_briefings,
             hikorea_changes=hikorea_briefings,
+            scrape_errors=scrape_result.errors,
+            keyword_candidates_md=keyword_candidates_md,
+            mention_handle=os.getenv("GITHUB_REPOSITORY", "/").split("/")[0] or None,
         )
         print("=" * 60)
         print("TITLE:", title)
@@ -94,7 +113,20 @@ def run(*, dry_run: bool = False) -> int:
     ok = publisher.publish(
         articles=article_briefings,
         hikorea_changes=hikorea_briefings,
+        scrape_errors=scrape_result.errors,
+        keyword_candidates_md=keyword_candidates_md,
     )
+
+    # 오래된 브리핑 Issue 자동 close (기본 30일)
+    if ok:
+        try:
+            keep_days = int(os.getenv("ISSUE_KEEP_DAYS", "30"))
+            n_closed = cleanup.close_old_briefings(days=keep_days)
+            if n_closed:
+                log.info("auto-closed %d old briefing issue(s)", n_closed)
+        except Exception:  # noqa: BLE001
+            log.exception("issue cleanup failed (non-fatal)")
+
     return 0 if ok else 1
 
 

@@ -37,6 +37,20 @@ DIFF_SYSTEM = """당신은 한국 이민·비자·외국인 정책 변경을 추
 - 출력은 변경 요약 본문만 포함하십시오. 머리말·맺음말 금지.
 """
 
+KEYWORD_SUGGEST_SYSTEM = """당신은 한국 이민·비자·외국인 정책 연구원의 키워드 사전 관리를 돕는 보조원입니다.
+정부 부처 보도자료 제목 목록을 받습니다. 이 중 **이민·비자·외국인·국적·체류·재외동포·외국인 인재 정책과 직접 관련 있다고 판단되는 제목만** 골라내십시오.
+
+판단 기준
+- 핵심 정책 (출입국·체류·국적·외국인 행정·재외동포·외국인 노동·외국인 학생 등): 포함
+- 단순 행사·홍보·인사 발령·일반 사회 정책: 제외
+
+출력 형식 (관련 있는 제목 1개당 정확히 한 줄, 다른 텍스트 금지)
+- "<제목>" → 추천 키워드: `<단어>` (한 줄 사유)
+
+관련 항목이 하나도 없으면 출력은 정확히 다음 한 줄:
+NONE
+"""
+
 
 @lru_cache(maxsize=1)
 def _client() -> anthropic.Anthropic:
@@ -131,3 +145,34 @@ def summarize_diff(*, file_name: str, old_text: str | None, new_text: str | None
         log.exception("Claude summarize_diff failed for: %s", file_name)
         return "(변경 요약 생성 실패 — 파일을 직접 비교하세요.)"
     return _extract_text(msg).strip()
+
+
+def suggest_keywords(candidates: list[tuple[str, str, str]], *, max_titles: int = 30) -> str:
+    """키워드 미매칭 제목들 중 정책 관련성 있는 후보를 식별.
+
+    candidates: list of (site_name, title, url)
+    Returns: Markdown 불릿 형식 문자열 (관련 항목 없으면 빈 문자열).
+    """
+    if not candidates:
+        return ""
+    sample = candidates[:max_titles]
+    lines = [f"- [{site}] {title}" for site, title, _ in sample]
+    user = (
+        "다음은 부처 보도자료 중 현재 키워드 사전(`이민/비자/외국인/...`)에는 안 걸렸지만 "
+        "윈도우 안에 게시된 제목 목록입니다. 정책 관련성을 평가해주세요.\n\n"
+        + "\n".join(lines)
+    )
+    try:
+        msg = _client().messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=1024,
+            system=_system_with_cache(KEYWORD_SUGGEST_SYSTEM),
+            messages=[{"role": "user", "content": user}],
+        )
+    except anthropic.APIError:
+        log.exception("Claude suggest_keywords failed")
+        return ""
+    text = _extract_text(msg).strip()
+    if text == "NONE" or not text:
+        return ""
+    return text
