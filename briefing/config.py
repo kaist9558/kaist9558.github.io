@@ -60,11 +60,12 @@ class Site:
     date_selector: str | None
     detail_content_selector: str
     encoding: str | None = None
+    requires_js: bool = False  # True면 Playwright(JsRenderer)로 페치
 
 
-# 법무부와 출입국·외국인정책본부는 같은 통합 CMS(artclLinkView/_artclTd*/_articleTable)를 사용.
-# 과기부(msit.go.kr)는 글 목록이 JS 렌더링으로 채워지는 SPA 형태라 정적 HTML 크롤링 불가 —
-# 현재는 비활성화. 추후 playwright 등 headless 브라우저 도입 시 재활성화.
+# 법무부·출입국은 통합 CMS(artclLinkView/_artclTd*/_articleTable) — 정적 HTTP로 충분.
+# 과기부는 글 목록이 JS로 렌더링되는 SPA 구조 — Playwright(requires_js=True)로 처리.
+# 과기부 셀렉터는 1차 placeholder. diagnose 모드 결과를 보고 정확한 클래스로 보정 필요.
 SITES: tuple[Site, ...] = (
     Site(
         name="법무부",
@@ -84,17 +85,23 @@ SITES: tuple[Site, ...] = (
         date_selector="td._artclTdRdate",
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
-    # TODO(msit): 과기부는 글 목록이 JS로 렌더링되는 구조 — 정적 HTML에 <table>이 없음.
-    # 재활성화 옵션: (1) playwright 도입, (2) 백엔드 AJAX 엔드포인트 직접 호출, (3) RSS 피드 활용.
-    # Site(
-    #     name="과학기술정보통신부",
-    #     list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
-    #     base_url="https://www.msit.go.kr",
-    #     row_selector="...",
-    #     title_link_selector="...",
-    #     date_selector="...",
-    #     detail_content_selector="...",
-    # ),
+    Site(
+        name="과학기술정보통신부",
+        list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
+        base_url="https://www.msit.go.kr",
+        requires_js=True,  # JS 렌더링 사이트 → Playwright 사용
+        # 1차 placeholder 셀렉터 — diagnose 결과 보고 정확한 값으로 교체.
+        row_selector=(
+            "div.board_list table tbody tr, table.board_list tbody tr, "
+            "table tbody tr, ul.board_list > li, div.bbsList li"
+        ),
+        title_link_selector="td.subject a, td.title a, a.title, .subject a, td a",
+        date_selector="td.date, td.reg_date, .date, td.regdate, .regdate",
+        detail_content_selector=(
+            "div.board_view, div.view_cont, div.viewCont, div.bbs_view, "
+            ".board_view_cont, .view_content, article, div.article_cont"
+        ),
+    ),
 )
 
 
