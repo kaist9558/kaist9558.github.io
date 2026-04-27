@@ -63,9 +63,10 @@ class Site:
     requires_js: bool = False  # True면 Playwright(JsRenderer)로 페치
 
 
-# 법무부·출입국은 통합 CMS(artclLinkView/_artclTd*/_articleTable) — 정적 HTTP로 충분.
-# 과기부는 글 목록이 JS로 렌더링되는 SPA 구조 — Playwright(requires_js=True)로 처리.
-# 과기부 셀렉터는 1차 placeholder. diagnose 모드 결과를 보고 정확한 클래스로 보정 필요.
+# 법무부·출입국·고용노동부 — 모두 정부 통합 CMS(artclLinkView/_artclTd*/_articleTable) 사용.
+# MSIT (msit.go.kr)는 글 목록이 정적 HTML에 없고 Playwright+stealth 로도 데이터 fetch
+# 시도조차 안 함 (날짜 패턴 0개, AJAX 힌트 없음 — 비-한국 IP 차단 추정). 이민 정책
+# 기여도가 낮아 추적 대상에서 제외. 필요 시 한국 IP proxy 또는 RSS 피드로 재도입 가능.
 SITES: tuple[Site, ...] = (
     Site(
         name="법무부",
@@ -86,21 +87,15 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        name="과학기술정보통신부",
-        list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
-        base_url="https://www.msit.go.kr",
-        requires_js=True,  # JS 렌더링 사이트 → Playwright 사용
-        # 1차 placeholder 셀렉터 — diagnose 결과 보고 정확한 값으로 교체.
-        row_selector=(
-            "div.board_list table tbody tr, table.board_list tbody tr, "
-            "table tbody tr, ul.board_list > li, div.bbsList li"
-        ),
-        title_link_selector="td.subject a, td.title a, a.title, .subject a, td a",
-        date_selector="td.date, td.reg_date, .date, td.regdate, .regdate",
-        detail_content_selector=(
-            "div.board_view, div.view_cont, div.viewCont, div.bbs_view, "
-            ".board_view_cont, .view_content, article, div.article_cont"
-        ),
+        name="고용노동부",
+        list_url="https://www.moel.go.kr/news/enews/list.do",
+        base_url="https://www.moel.go.kr",
+        # 정부 통합 CMS 추정 — MOJ/Immigration과 동일 셀렉터로 1차 시도.
+        # 다르면 diagnose 결과로 보정.
+        row_selector="div._articleTable table tbody tr, table tbody tr",
+        title_link_selector="a.artclLinkView, td._artclTdTitle a",
+        date_selector="td._artclTdRdate",
+        detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
 )
 
