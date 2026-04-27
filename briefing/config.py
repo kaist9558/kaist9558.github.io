@@ -62,34 +62,39 @@ class Site:
     encoding: str | None = None
 
 
+# 법무부와 출입국·외국인정책본부는 같은 통합 CMS(artclLinkView/_artclTd*/_articleTable)를 사용.
+# 과기부(msit.go.kr)는 글 목록이 JS 렌더링으로 채워지는 SPA 형태라 정적 HTML 크롤링 불가 —
+# 현재는 비활성화. 추후 playwright 등 headless 브라우저 도입 시 재활성화.
 SITES: tuple[Site, ...] = (
     Site(
         name="법무부",
         list_url="https://www.moj.go.kr/moj/221/subview.do",
         base_url="https://www.moj.go.kr",
-        row_selector="table.board_list tbody tr, div.board_list table tbody tr, ul.board_list li",
-        title_link_selector="td.title a, td.subject a, a.title, .title a",
-        date_selector="td.date, td.reg_date, .date",
-        detail_content_selector="div.board_view, div.view_cont, .board_view_cont, .bbs_view",
+        row_selector="div._articleTable table tbody tr, table tbody tr",
+        title_link_selector="a.artclLinkView, td._artclTdTitle a",
+        date_selector="td._artclTdRdate",
+        detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
         name="출입국·외국인정책본부",
         list_url="https://www.immigration.go.kr/immigration/1502/subview.do",
         base_url="https://www.immigration.go.kr",
-        row_selector="table tbody tr, div.board_list table tbody tr, ul.board_list li",
-        title_link_selector="td.title a, td.subject a, a.title, .title a, td a",
-        date_selector="td.date, td.reg_date, .date, td:nth-of-type(4)",
-        detail_content_selector="div.board_view, div.view_cont, .board_view_cont, .bbs_view, .view_content",
+        row_selector="div._articleTable table tbody tr, table tbody tr",
+        title_link_selector="a.artclLinkView, td._artclTdTitle a",
+        date_selector="td._artclTdRdate",
+        detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
-    Site(
-        name="과학기술정보통신부",
-        list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
-        base_url="https://www.msit.go.kr",
-        row_selector="table.board_list tbody tr, div.board_list table tbody tr, table tbody tr",
-        title_link_selector="td.title a, td.subject a, a.title, .title a, td a",
-        date_selector="td.date, td.reg_date, .date",
-        detail_content_selector="div.board_view, div.view_cont, .board_view_cont, .bbs_view, .view_content",
-    ),
+    # TODO(msit): 과기부는 글 목록이 JS로 렌더링되는 구조 — 정적 HTML에 <table>이 없음.
+    # 재활성화 옵션: (1) playwright 도입, (2) 백엔드 AJAX 엔드포인트 직접 호출, (3) RSS 피드 활용.
+    # Site(
+    #     name="과학기술정보통신부",
+    #     list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
+    #     base_url="https://www.msit.go.kr",
+    #     row_selector="...",
+    #     title_link_selector="...",
+    #     date_selector="...",
+    #     detail_content_selector="...",
+    # ),
 )
 
 
