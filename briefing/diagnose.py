@@ -56,6 +56,8 @@ def inspect_site(session, site: Site, js_renderer=None) -> None:
         html = js_renderer.fetch(site.list_url)
         if html is None:
             print("FETCH FAILED — JS 렌더 페이지 로드 실패")
+            if getattr(js_renderer, "last_error", None):
+                print(f"  원인: {js_renderer.last_error}")
             return
         print(f"JS 렌더 완료. size={len(html)} bytes")
     else:
