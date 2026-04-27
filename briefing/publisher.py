@@ -42,7 +42,6 @@ def render_markdown(
     hikorea_changes: list[HikoreaBriefing],
     scrape_errors: list[tuple[str, str]] | None = None,
     keyword_candidates_md: str = "",
-    mention_handle: str | None = None,
 ) -> tuple[str, str]:
     today = datetime.now(KST).strftime("%Y-%m-%d")
     title = f"[일일 브리핑] 이민·비자 정책 동향 ({today})"
@@ -83,31 +82,18 @@ def render_markdown(
         for site, msg in scrape_errors:
             lines.append(f"- **{site}**: {msg}")
         lines.append("")
-        lines.append(
-            "_조치: `briefing/config.py` 의 `SITES` 항목에서 해당 사이트의 셀렉터를 점검하세요._"
-        )
-        lines.append("")
 
     if keyword_candidates_md:
         lines.append("## 🧐 키워드 후보 (수동 검토 권장)")
         lines.append("")
         lines.append(
-            "_현재 키워드 사전엔 안 걸렸지만 정책 관련성이 의심되는 제목들입니다. "
-            "필요한 단어를 `briefing/config.py` 의 `KEYWORDS` 튜플에 추가하면 다음 실행부터 자동 포착됩니다._"
+            "_현재 키워드 사전엔 안 걸렸지만 정책 관련성이 의심되는 제목들입니다._"
         )
         lines.append("")
         lines.append(keyword_candidates_md)
         lines.append("")
 
-    lines.append("---")
-    lines.append("_자동 생성 — `kaist9558/kaist9558.github.io` · briefing_")
-
-    has_content = bool(articles or hikorea_changes or scrape_errors or keyword_candidates_md)
-    if mention_handle and has_content:
-        lines.append("")
-        lines.append(f"cc @{mention_handle}")
-
-    return title, "\n".join(lines)
+    return title, "\n".join(lines).rstrip() + "\n"
 
 
 def publish(
@@ -127,13 +113,11 @@ def publish(
         )
         return False
 
-    owner = repo.split("/")[0] if "/" in repo else None
     title, body = render_markdown(
         articles=articles,
         hikorea_changes=hikorea_changes,
         scrape_errors=scrape_errors,
         keyword_candidates_md=keyword_candidates_md,
-        mention_handle=owner,
     )
 
     url = f"{GITHUB_API}/repos/{repo}/issues"

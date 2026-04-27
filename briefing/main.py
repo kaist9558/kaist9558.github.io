@@ -102,7 +102,6 @@ def run(*, dry_run: bool = False) -> int:
             hikorea_changes=hikorea_briefings,
             scrape_errors=scrape_result.errors,
             keyword_candidates_md=keyword_candidates_md,
-            mention_handle=os.getenv("GITHUB_REPOSITORY", "/").split("/")[0] or None,
         )
         print("=" * 60)
         print("TITLE:", title)

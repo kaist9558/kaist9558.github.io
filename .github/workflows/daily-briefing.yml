@@ -11,6 +11,10 @@ on:
         description: "Issue를 생성하지 않고 본문만 출력"
         required: false
         default: "false"
+      diagnose:
+        description: "각 사이트 HTML 구조 진단 (셀렉터 보정용, 본 작업은 실행 안 함)"
+        required: false
+        default: "false"
 
 jobs:
   run-briefing:
@@ -52,7 +56,9 @@ jobs:
           # GITHUB_REPOSITORY is auto-set by the runner; GITHUB_TOKEN must be passed explicitly.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "${{ github.event.inputs.diagnose }}" = "true" ]; then
+            python -m briefing.diagnose
+          elif [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             python -m briefing.main --dry-run
           else
             python -m briefing.main
