@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.local
+
+# Briefing runtime data — committed to a separate workflow artifact instead
+data/state.sqlite3
+data/state.sqlite3-journal
+data/hikorea_files/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
