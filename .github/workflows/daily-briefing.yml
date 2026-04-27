@@ -1,0 +1,69 @@
+name: Daily Immigration Policy Briefing
+
+on:
+  schedule:
+    # 한국시간 매일 오전 8시 = UTC 23시 (전날)
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "이메일 발송 없이 본문만 출력"
+        required: false
+        default: "false"
+
+jobs:
+  run-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore briefing state cache
+        id: state-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/state.sqlite3
+            data/hikorea_files
+          # Cache key bumps weekly so we don't grow forever; previous version restored on miss.
+          key: briefing-state-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            briefing-state-${{ runner.os }}-
+
+      - name: Run briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+          LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '1' }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python -m briefing.main --dry-run
+          else
+            python -m briefing.main
+          fi
+
+      - name: Upload state as artifact (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: briefing-state-${{ github.run_id }}
+          path: |
+            data/state.sqlite3
+            data/hikorea_files/
+          retention-days: 30
+          if-no-files-found: ignore
