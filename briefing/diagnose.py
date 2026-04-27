@@ -41,22 +41,34 @@ CANDIDATE_ROW_SELECTORS = [
 ]
 
 
-def inspect_site(session, site: Site) -> None:
+def inspect_site(session, site: Site, js_renderer=None) -> None:
     print()
     print("=" * 70)
     print(f"[{site.name}]  {site.list_url}")
+    if site.requires_js:
+        print("(requires_js=True — Playwright 사용)")
     print("=" * 70)
 
-    res = get(session, site.list_url, encoding=site.encoding)
-    if res is None:
-        print("FETCH FAILED — http_client.get returned None")
-        return
+    if site.requires_js:
+        if js_renderer is None:
+            print("FETCH FAILED — JS 렌더러 미초기화")
+            return
+        html = js_renderer.fetch(site.list_url)
+        if html is None:
+            print("FETCH FAILED — JS 렌더 페이지 로드 실패")
+            return
+        print(f"JS 렌더 완료. size={len(html)} bytes")
+    else:
+        res = get(session, site.list_url, encoding=site.encoding)
+        if res is None:
+            print("FETCH FAILED — http_client.get returned None")
+            return
+        html = res.text
+        print(f"HTTP {res.status_code}   size={len(res.text)} bytes   encoding={res.encoding}")
+        if res.headers.get("content-type"):
+            print(f"Content-Type: {res.headers['content-type']}")
 
-    print(f"HTTP {res.status_code}   size={len(res.text)} bytes   encoding={res.encoding}")
-    if res.headers.get("content-type"):
-        print(f"Content-Type: {res.headers['content-type']}")
-
-    soup = BeautifulSoup(res.text, "lxml")
+    soup = BeautifulSoup(html, "lxml")
 
     page_title = soup.find("title")
     print(f"<title>: {page_title.get_text(strip=True) if page_title else '(none)'}")
@@ -129,38 +141,63 @@ def inspect_site(session, site: Site) -> None:
                 from urllib.parse import urljoin
                 detail_url = urljoin(site.base_url + "/", link["href"])
                 print(f"\n--- 첫 글 상세페이지: {detail_url}")
-                detail_res = get(session, detail_url, encoding=site.encoding)
-                if detail_res is None:
-                    print("  detail fetch failed")
+                if site.requires_js and js_renderer is not None:
+                    detail_html = js_renderer.fetch(detail_url)
+                    if detail_html is None:
+                        print("  detail fetch failed (JS renderer)")
+                        return
+                    detail_soup = BeautifulSoup(detail_html, "lxml")
+                    print(f"  JS 렌더 완료 size={len(detail_html)}")
                 else:
+                    detail_res = get(session, detail_url, encoding=site.encoding)
+                    if detail_res is None:
+                        print("  detail fetch failed")
+                        return
                     detail_soup = BeautifulSoup(detail_res.text, "lxml")
                     print(f"  HTTP {detail_res.status_code} size={len(detail_res.text)}")
-                    # 본문 컨테이너 후보
-                    print("  본문 컨테이너 후보:")
-                    body_seen = set()
-                    for tag in detail_soup.find_all(["div", "article", "section"]):
-                        cls = " ".join(tag.get("class") or [])
-                        tid = tag.get("id") or ""
-                        attr_text = (cls + " " + tid).lower()
-                        if not any(k in attr_text for k in ("view", "cont", "body", "article", "detail")):
-                            continue
-                        sig = f"{tag.name}:{cls}:{tid}"
-                        if sig in body_seen:
-                            continue
-                        body_seen.add(sig)
-                        text_len = len(tag.get_text(" ", strip=True))
-                        if text_len < 50:
-                            continue
-                        print(f"    <{tag.name} class={cls!r} id={tid!r}> 텍스트 {text_len}자")
+                # 본문 컨테이너 후보
+                print("  본문 컨테이너 후보:")
+                body_seen = set()
+                for tag in detail_soup.find_all(["div", "article", "section"]):
+                    cls = " ".join(tag.get("class") or [])
+                    tid = tag.get("id") or ""
+                    attr_text = (cls + " " + tid).lower()
+                    if not any(k in attr_text for k in ("view", "cont", "body", "article", "detail")):
+                        continue
+                    sig = f"{tag.name}:{cls}:{tid}"
+                    if sig in body_seen:
+                        continue
+                    body_seen.add(sig)
+                    text_len = len(tag.get_text(" ", strip=True))
+                    if text_len < 50:
+                        continue
+                    print(f"    <{tag.name} class={cls!r} id={tid!r}> 텍스트 {text_len}자")
 
 
 def main() -> int:
     session = make_session()
-    for site in SITES:
+    needs_js = any(s.requires_js for s in SITES)
+    js_ctx = None
+    if needs_js:
         try:
-            inspect_site(session, site)
+            from .js_fetcher import JsRenderer
+            js_ctx = JsRenderer()
+            js_ctx.__enter__()
+            print("(JS 렌더러 준비 완료 — Playwright Chromium)")
         except Exception as exc:  # noqa: BLE001
-            print(f"[{site.name}] 진단 중 예외: {type(exc).__name__}: {exc}")
+            print(f"(JS 렌더러 초기화 실패: {type(exc).__name__}: {exc} — JS 사이트는 스킵됨)")
+            js_ctx = None
+
+    try:
+        for site in SITES:
+            try:
+                renderer = js_ctx if site.requires_js else None
+                inspect_site(session, site, js_renderer=renderer)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[{site.name}] 진단 중 예외: {type(exc).__name__}: {exc}")
+    finally:
+        if js_ctx is not None:
+            js_ctx.__exit__(None, None, None)
     return 0
 
 
