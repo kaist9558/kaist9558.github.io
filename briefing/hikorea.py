@@ -60,6 +60,8 @@ def _extract_text(path: Path) -> str | None:
 
 def _find_attachment_links(soup: BeautifulSoup) -> list[tuple[str, str]]:
     """Returns list of (display_name, href) for file download links."""
+    from urllib.parse import urlparse
+
     candidates: list[tuple[str, str]] = []
     seen: set[str] = set()
     for a in soup.find_all("a"):
@@ -67,6 +69,16 @@ def _find_attachment_links(soup: BeautifulSoup) -> list[tuple[str, str]]:
         text = a.get_text(" ", strip=True)
         if not href or not text:
             continue
+
+        # 외부 링크 제외 (예: 페이지 본문 안에 박힌 microsoft.com 'HWP 뷰어 다운로드' 안내).
+        # netloc이 비어있으면 상대경로 (hikorea 자체) — 통과.
+        parsed = urlparse(href)
+        if parsed.netloc and "hikorea.go.kr" not in parsed.netloc.lower():
+            continue
+        # 스킴이 http/https/없음(상대경로)이 아닌 것은 제외 (예: ttp://... 오타).
+        if parsed.scheme and parsed.scheme.lower() not in ("http", "https"):
+            continue
+
         href_l = href.lower()
         is_download = (
             "download" in href_l

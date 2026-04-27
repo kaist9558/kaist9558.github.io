@@ -9,12 +9,14 @@ on:
     inputs:
       dry_run:
         description: "Issue를 생성하지 않고 본문만 출력"
+        type: boolean
         required: false
-        default: "false"
+        default: false
       diagnose:
         description: "각 사이트 HTML 구조 진단 (셀렉터 보정용, 본 작업은 실행 안 함)"
+        type: boolean
         required: false
-        default: "false"
+        default: false
 
 jobs:
   run-briefing:
