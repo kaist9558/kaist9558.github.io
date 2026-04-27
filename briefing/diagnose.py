@@ -191,6 +191,45 @@ def inspect_site(session, site: Site, js_renderer=None) -> None:
         if not article_link_patterns:
             print("  (의심스러운 글-링크 패턴 없음)")
 
+        # iframe / 외부 script / body 통계 — 글 목록이 iframe·후속AJAX·딴 데서 오는지 식별
+        print("\n--- iframe / script src ---")
+        iframes = soup.find_all("iframe")
+        if iframes:
+            print(f"iframe {len(iframes)}개 발견 (글 목록이 여기 들어있을 수 있음):")
+            for ifr in iframes[:5]:
+                src = ifr.get("src", "") or ifr.get("data-src", "")
+                print(f"  <iframe src={src[:140]!r}>")
+        else:
+            print("iframe 없음")
+        ext_scripts = [s.get("src", "") for s in soup.find_all("script", src=True)]
+        ajax_hint = [s for s in ext_scripts if any(k in s.lower() for k in ("api", "json", "list", "data", "fetch", "ajax"))]
+        if ajax_hint:
+            print(f"\n글-API 의심 script src ({len(ajax_hint)}개):")
+            for s in ajax_hint[:8]:
+                print(f"  {s[:160]!r}")
+
+        # body 통계 — '데이터를 불러오는 중' 같은 placeholder 메시지 탐지
+        print("\n--- body 통계 ---")
+        body = soup.find("body")
+        if body:
+            body_text = body.get_text(" ", strip=True)
+            a_count = len(body.find_all("a"))
+            print(f"<body> 텍스트 {len(body_text)}자, <a> {a_count}개")
+            for keyword in ["데이터를 불러", "불러오는 중", "loading", "잠시만", "오류가 발생", "권한이 없", "로그인이 필요"]:
+                if keyword in body_text:
+                    idx = body_text.find(keyword)
+                    ctx = body_text[max(0, idx - 30): idx + 80]
+                    print(f"  '{keyword}' 발견: {ctx!r}")
+            # 날짜 패턴 등장 횟수 — 글 목록이 있으면 보통 10개 이상
+            date_count = len(re.findall(r"\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}", body_text))
+            print(f"날짜 패턴(YYYY.MM.DD) 등장 횟수: {date_count}")
+
+        # 최종 URL — 리다이렉트로 다른 페이지에 갔는지 확인
+        if site.requires_js and js_renderer is not None:
+            final_url = getattr(js_renderer, "last_final_url", None)
+            if final_url and final_url != site.list_url:
+                print(f"\n⚠️ 최종 URL이 list_url과 다름: {final_url}")
+
     # 4) 본문 추출 시도 — 셀렉터 첫 후보로 첫 글의 상세페이지에 접속해 본문 컨테이너 후보 보고
     if matches:
         best_sel, _ = matches[0]

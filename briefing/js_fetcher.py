@@ -29,8 +29,9 @@ Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
 """
 
 DEFAULT_GOTO_TIMEOUT_MS = 60_000
-NETWORK_IDLE_TIMEOUT_MS = 20_000
+NETWORK_IDLE_TIMEOUT_MS = 40_000  # 추가 AJAX가 늦게 오는 KR gov SPA 대응
 WAIT_SELECTOR_TIMEOUT_MS = 10_000
+POST_IDLE_GRACE_MS = 3_000  # networkidle 후에도 다음 XHR 한 번 더 기다림
 
 
 class JsRenderer:
@@ -83,24 +84,33 @@ class JsRenderer:
                 pass
 
     def fetch(self, url: str, *, wait_selector: Optional[str] = None) -> Optional[str]:
-        """렌더링된 페이지 HTML 반환. 실패 시 None (last_error에 사유 기록)."""
+        """렌더링된 페이지 HTML 반환. 실패 시 None (last_error에 사유 기록).
+
+        부수 효과: self.last_final_url에 최종 URL(리다이렉트 후) 기록.
+        """
         if self._context is None:
             raise RuntimeError("JsRenderer must be used as a context manager")
 
         self.last_error = None
+        self.last_final_url: Optional[str] = None
         page = self._context.new_page()
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=DEFAULT_GOTO_TIMEOUT_MS)
             try:
                 page.wait_for_load_state("networkidle", timeout=NETWORK_IDLE_TIMEOUT_MS)
             except Exception:  # noqa: BLE001
-                # networkidle 도달 실패해도 일단 진행 (DOM은 이미 로드됨)
                 log.debug("networkidle timeout for %s — proceeding anyway", url)
+            # networkidle 후 한 번 더 grace — 마지막 XHR이 살짝 늦게 시작했을 때 대비
+            try:
+                page.wait_for_timeout(POST_IDLE_GRACE_MS)
+            except Exception:  # noqa: BLE001
+                pass
             if wait_selector:
                 try:
                     page.wait_for_selector(wait_selector, timeout=WAIT_SELECTOR_TIMEOUT_MS)
                 except Exception:  # noqa: BLE001
                     log.warning("wait_selector %r not found on %s", wait_selector, url)
+            self.last_final_url = page.url
             return page.content()
         except Exception as exc:  # noqa: BLE001
             err = f"{type(exc).__name__}: {exc}"
