@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<!-- 페이지 언어를 한국어로 지정 -->
+<html lang="ko">
+<head>
+  <!-- 문자 인코딩과 모바일 반응형 설정 -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 브라우저 탭 제목 -->
+  <title>Shortform Pulse — Output Layer V0 (HW6)</title>
+
+  <!-- Tailwind CSS를 CDN으로 로드 (별도 빌드 불필요) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- 커스텀 스타일 (스피너, 탭 활성 표시 등) -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <!-- 페이지 본문 컨테이너 — 가로폭을 4xl로 제한해서 가독성 확보 -->
+  <main class="max-w-3xl mx-auto px-4 py-8 sm:py-12">
+
+    <!-- ========== 헤더 영역: 페이지 제목 + 부제 + 과제 안내 ========== -->
+    <header class="mb-8">
+      <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight">
+        Shortform Pulse — Output Layer V0 (HW6)
+      </h1>
+      <p class="text-gray-600 text-sm sm:text-base">
+        팀 프로젝트의 마지막 마디 — 트렌드 → 컨텐츠 마케팅 대본 초안
+      </p>
+      <p class="text-xs text-gray-400 mt-2 leading-relaxed">
+        본 데모는 KAIST 수업 HW6 과제이며, 그룹 프로젝트
+        <a href="https://github.com/seu-seo/trendingshorts" target="_blank" rel="noopener" class="underline hover:text-gray-600">trendingshorts</a>의 일부입니다.
+      </p>
+    </header>
+
+    <!-- ========== 트렌딩 영상 카드: V0는 샘플 데이터 하드코딩 ========== -->
+    <!-- V1에서는 규동님 백엔드 API 응답으로 교체될 예정 -->
+    <section class="bg-white rounded-xl border border-gray-200 p-5 mb-6 shadow-sm">
+      <!-- 카드 상단: 트렌딩 뱃지 + 플랫폼 -->
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">TRENDING</span>
+        <span class="text-xs text-gray-500">YouTube Shorts</span>
+      </div>
+
+      <!-- 영상 제목 -->
+      <h2 class="text-lg font-bold mb-2 leading-snug">
+        초간단 5분 양치 루틴, 이거 모르면 손해
+      </h2>
+
+      <!-- 카테고리 태그 -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">카테고리: 오럴케어/생활</span>
+      </div>
+
+      <!-- 메타데이터: 조회수 / 좋아요 / 인게이지먼트 -->
+      <div class="grid grid-cols-3 gap-3 text-center pt-3 border-t border-gray-100">
+        <div>
+          <div class="text-xs text-gray-500 mb-1">조회수</div>
+          <div class="font-bold">1.2M</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500 mb-1">좋아요</div>
+          <div class="font-bold">98K</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500 mb-1">인게이지먼트</div>
+          <div class="font-bold text-green-600">8.2%</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">avg 5.91% 대비 +39%</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== API 키 입력 영역 ========== -->
+    <section class="bg-white rounded-xl border border-gray-200 p-5 mb-4 shadow-sm">
+      <!-- 입력 필드 라벨 -->
+      <label for="apiKey" class="block text-sm font-semibold mb-2">Anthropic API 키</label>
+
+      <!-- 비밀번호 타입 입력으로 키가 화면에 보이지 않게 처리 -->
+      <input
+        type="password"
+        id="apiKey"
+        placeholder="sk-ant-..."
+        autocomplete="off"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+      />
+
+      <!-- 보안/사용 안내 문구 -->
+      <p class="text-xs text-gray-500 mt-3 leading-relaxed">
+        데모용으로 본인 Anthropic API 키를 입력하세요. 키는 브라우저 메모리(sessionStorage)에만 저장되며 어디로도 전송되지 않습니다. 페이지를 새로고침하거나 닫으면 사라집니다.
+      </p>
+      <p class="text-xs text-gray-500 mt-1">
+        키 받는 곳:
+        <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="text-blue-600 underline hover:text-blue-800">console.anthropic.com</a>
+      </p>
+    </section>
+
+    <!-- ========== 생성 버튼 ========== -->
+    <!-- 클릭 시 3가지 톤(정보형/스토리형/후킹형) 병렬 호출 -->
+    <button
+      id="generateBtn"
+      class="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      대본 초안 생성
+    </button>
+
+    <!-- ========== 에러 메시지 영역 (평소엔 숨김) ========== -->
+    <div id="errorBox" class="hidden mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm whitespace-pre-line"></div>
+
+    <!-- ========== 결과 영역 (생성 후 표시) ========== -->
+    <section id="results" class="hidden mt-8">
+      <!-- 탭 헤더: 정보형 / 스토리형 / 후킹형 -->
+      <div class="flex border-b border-gray-200 mb-5">
+        <button data-tab="info" class="tab-btn active px-4 py-2 text-sm font-semibold">정보형</button>
+        <button data-tab="story" class="tab-btn px-4 py-2 text-sm font-semibold">스토리형</button>
+        <button data-tab="hook" class="tab-btn px-4 py-2 text-sm font-semibold">후킹형</button>
+      </div>
+
+      <!-- 탭별 결과 컨테이너 — script.js가 내용을 채움 -->
+      <div class="tab-content" data-tab-content="info"></div>
+      <div class="tab-content hidden" data-tab-content="story"></div>
+      <div class="tab-content hidden" data-tab-content="hook"></div>
+    </section>
+
+    <!-- ========== 푸터: V0 한계 안내 ========== -->
+    <footer class="mt-12 pt-6 border-t border-gray-200 text-center">
+      <p class="text-xs text-gray-400 leading-relaxed">
+        현재 V0는 샘플 데이터 하드코딩.<br />
+        V1에서 trendingshorts 백엔드와 연결 예정.
+      </p>
+    </footer>
+  </main>
+
+  <!-- 메인 로직 (API 호출, 렌더링, 탭 전환 등) -->
+  <script src="script.js"></script>
+</body>
+</html>
