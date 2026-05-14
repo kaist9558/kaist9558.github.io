@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from . import cleanup, emailer, publisher, scraper, storage, summarizer  # noqa: E402
+from . import cleanup, emailer, publisher, scraper, storage, summarizer, tracked_pages  # noqa: E402
 from .config import SITES, ensure_dirs  # noqa: E402
 
 logging.basicConfig(
@@ -43,6 +43,7 @@ def run(*, dry_run: bool = False) -> int:
         all_new_titles.setdefault(site, []).append((title, url))
 
     log.info("Step 2/3: classifying & summarizing immigration-relevant articles")
+    tracked_changes: list[tracked_pages.TrackedPageChange] = []
     with storage.connect() as conn:
         for art in scrape_result.articles:
             key = (art.site, art.url)
@@ -65,10 +66,15 @@ def run(*, dry_run: bool = False) -> int:
                 )
             )
 
+        # 추적 페이지(단일 글 갱신) 검사 — 같은 connection 안에서 수행해 트랜잭션 일관성.
+        tracked_changes = tracked_pages.check_all(conn)
+        log.info("  tracked-page changes detected: %d", len(tracked_changes))
+
     title, body = publisher.render_markdown(
         articles=article_briefings,
         all_new_titles=all_new_titles,
         scrape_errors=scrape_result.errors,
+        tracked_changes=tracked_changes,
     )
 
     if dry_run:
@@ -113,6 +119,7 @@ def run(*, dry_run: bool = False) -> int:
             articles=article_briefings,
             all_new_titles=all_new_titles,
             scrape_errors=scrape_result.errors,
+            tracked_changes=tracked_changes,
         )
         delivered_any = delivered_any or issue_ok
 

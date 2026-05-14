@@ -44,6 +44,7 @@ def render_markdown(
     articles: list[ArticleBriefing],
     all_new_titles: dict[str, list[tuple[str, str]]] | None = None,
     scrape_errors: list[tuple[str, str]] | None = None,
+    tracked_changes: list | None = None,
 ) -> tuple[str, str]:
     now = datetime.now(KST)
     today = now.strftime("%Y-%m-%d")
@@ -122,6 +123,24 @@ def render_markdown(
             lines.append("_새 글 없음_")
         lines.append("")
 
+    # 추적 페이지(고정 URL 단일 글) 의 첨부파일 갱신 알림.
+    if tracked_changes:
+        lines.append("---")
+        lines.append("")
+        lines.append("## 🔔 추적 페이지 갱신")
+        lines.append("")
+        for tc in tracked_changes:
+            tag = "🆕 첫 추적" if tc.is_first else "✏️ 변경 감지"
+            lines.append(f"### {tag} · [{tc.label}]({tc.url})")
+            lines.append("")
+            if tc.attachments:
+                lines.append("> 첨부 파일:")
+                for fname in tc.attachments:
+                    lines.append(f"> - {fname}")
+            else:
+                lines.append("> (첨부 파일 메타 추출 실패 — 페이지 직접 확인 권장)")
+            lines.append("")
+
     if scrape_errors:
         lines.append("---")
         lines.append("")
@@ -139,6 +158,7 @@ def publish(
     articles: list[ArticleBriefing],
     all_new_titles: dict[str, list[tuple[str, str]]] | None = None,
     scrape_errors: list[tuple[str, str]] | None = None,
+    tracked_changes: list | None = None,
 ) -> bool:
     repo = os.getenv("GITHUB_REPOSITORY")
     token = os.getenv("GITHUB_TOKEN")
@@ -154,6 +174,7 @@ def publish(
         articles=articles,
         all_new_titles=all_new_titles,
         scrape_errors=scrape_errors,
+        tracked_changes=tracked_changes,
     )
 
     url = f"{GITHUB_API}/repos/{repo}/issues"

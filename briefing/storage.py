@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS seen_articles (
     first_seen TEXT NOT NULL,
     PRIMARY KEY (site, url)
 );
+
+CREATE TABLE IF NOT EXISTS tracked_pages (
+    label TEXT PRIMARY KEY,
+    content_hash TEXT NOT NULL,
+    last_checked TEXT NOT NULL
+);
 """
 
 
@@ -43,4 +49,27 @@ def mark_article_seen(conn: sqlite3.Connection, site: str, url: str, title: str)
     conn.execute(
         "INSERT OR IGNORE INTO seen_articles(site, url, title, first_seen) VALUES (?, ?, ?, ?)",
         (site, url, title, datetime.now(KST).isoformat()),
+    )
+
+
+def get_tracked_page_hash(conn: sqlite3.Connection, label: str) -> str | None:
+    row = conn.execute(
+        "SELECT content_hash FROM tracked_pages WHERE label = ?",
+        (label,),
+    ).fetchone()
+    return row["content_hash"] if row else None
+
+
+def upsert_tracked_page_hash(
+    conn: sqlite3.Connection, label: str, content_hash: str
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO tracked_pages(label, content_hash, last_checked)
+        VALUES (?, ?, ?)
+        ON CONFLICT(label) DO UPDATE SET
+            content_hash = excluded.content_hash,
+            last_checked = excluded.last_checked
+        """,
+        (label, content_hash, datetime.now(KST).isoformat()),
     )
