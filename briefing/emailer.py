@@ -8,6 +8,8 @@ import ssl
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
 
+import requests
+
 log = logging.getLogger(__name__)
 
 
@@ -80,16 +82,94 @@ def _recipient() -> str | None:
     return os.getenv("BRIEFING_RECIPIENT_EMAIL") or os.getenv("EMAIL_RECEIVER")
 
 
-def is_configured() -> bool:
-    """이메일 발송에 필요한 최소 환경변수가 모두 설정됐는지 확인.
+def _resend_api_key() -> str | None:
+    return os.getenv("RESEND_API_KEY")
 
-    기존 운영 시 사용하던 EMAIL_SENDER / EMAIL_PASSWORD / EMAIL_RECEIVER 그대로 동작하며,
-    새 네이밍(SMTP_USER / SMTP_PASSWORD / BRIEFING_RECIPIENT_EMAIL)도 fallback 으로 지원.
+
+def is_configured() -> bool:
+    """이메일 발송에 필요한 최소 환경변수가 설정됐는지 확인.
+
+    채널 우선순위:
+      1) Resend HTTPS API — RESEND_API_KEY + 수신자
+      2) SMTP             — EMAIL_SENDER + EMAIL_PASSWORD + 수신자
+                            (또는 SMTP_USER / SMTP_PASSWORD / BRIEFING_RECIPIENT_EMAIL)
     """
-    return bool(_sender() and _password() and _recipient())
+    if not _recipient():
+        return False
+    if _resend_api_key():
+        return True
+    if _sender() and _password():
+        return True
+    return False
+
+
+def _resend_from() -> str:
+    """Resend 발신자 — 도메인 검증 전엔 Resend 의 onboarding@resend.dev 가 안전한 기본값.
+    환경변수 RESEND_FROM 으로 검증된 자체 도메인 주소로 덮어쓸 수 있다."""
+    return os.getenv("RESEND_FROM") or "onboarding@resend.dev"
+
+
+def _send_via_resend(*, subject: str, markdown_body: str) -> bool:
+    api_key = _resend_api_key()
+    raw_recipients = _recipient()
+    if not (api_key and raw_recipients):
+        log.error("Resend 자격 증명 누락 — RESEND_API_KEY 와 수신자 주소를 확인하세요.")
+        return False
+
+    recipients = [r.strip() for r in raw_recipients.split(",") if r.strip()]
+    if not recipients:
+        log.error("수신자 주소가 비어 있습니다.")
+        return False
+
+    safe_markdown = _strip_github_references(markdown_body)
+    safe_subject = _strip_github_references(subject)
+    html_body = _render_html(safe_markdown)
+
+    sender_addr = _resend_from()
+    sender_name = os.getenv("SMTP_FROM_NAME") or "이민·비자 정책 브리핑"
+    from_header = formataddr((sender_name, sender_addr))
+
+    payload = {
+        "from": from_header,
+        "to": recipients,
+        "subject": safe_subject,
+        "html": html_body,
+        "text": safe_markdown,
+    }
+
+    try:
+        res = requests.post(
+            "https://api.resend.com/emails",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=30,
+        )
+        res.raise_for_status()
+    except requests.RequestException as exc:
+        log.exception("Resend 전송 실패: %s", exc)
+        if exc.response is not None:
+            log.error("응답 본문: %s", exc.response.text[:500])
+        return False
+
+    log.info(
+        "브리핑 이메일 전송 완료 (Resend): id=%s, to=%s",
+        res.json().get("id"),
+        ", ".join(recipients),
+    )
+    return True
 
 
 def send(*, subject: str, markdown_body: str) -> bool:
+    """브리핑 이메일 발송. RESEND_API_KEY 가 있으면 Resend, 없으면 SMTP."""
+    if _resend_api_key():
+        return _send_via_resend(subject=subject, markdown_body=markdown_body)
+    return _send_via_smtp(subject=subject, markdown_body=markdown_body)
+
+
+def _send_via_smtp(*, subject: str, markdown_body: str) -> bool:
     """SMTP로 브리핑 이메일 발송.
 
     필수 env (택1):
