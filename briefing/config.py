@@ -101,7 +101,9 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        name="하이코리아 보도자료",
+        # 발행 주체는 출입국·외국인정책본부, 하이코리아 메뉴의 '보도자료' 가 외부
+        # 링크로 이 URL 을 가리킴 — 두 명칭이 같은 출처를 가리키므로 병기.
+        name="출입국외국인정책본부/하이코리아 보도자료",
         list_url="https://www.immigration.go.kr/immigration/1502/subview.do",
         base_url="https://www.immigration.go.kr",
         row_selector="div._articleTable table tbody tr, table tbody tr",
