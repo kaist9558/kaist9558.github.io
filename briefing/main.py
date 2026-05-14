@@ -65,13 +65,6 @@ def run(*, dry_run: bool = False) -> int:
                 )
             )
 
-    log.info(
-        "Step 3/3: publishing GitHub Issue (relevant=%d, total_new=%d, errors=%d)",
-        len(article_briefings),
-        sum(len(v) for v in all_new_titles.values()),
-        len(scrape_result.errors),
-    )
-
     title, body = publisher.render_markdown(
         articles=article_briefings,
         all_new_titles=all_new_titles,
@@ -86,12 +79,26 @@ def run(*, dry_run: bool = False) -> int:
         return 0
 
     # 채널 선택:
-    #   BRIEFING_RECIPIENT_EMAIL + SMTP_* 가 모두 설정되면 이메일로 발송 (GitHub 식별자 미노출).
-    #   BRIEFING_PUBLISH_ISSUE 기본값: 이메일이 설정돼 있으면 "0"(Issue 미생성),
-    #   아니면 "1"(기존 동작 그대로 Issue 생성). 명시적 지정이 우선.
+    #   - 이메일 자격 증명(EMAIL_SENDER/PASSWORD + 수신자, 또는 RESEND_API_KEY + 수신자)이
+    #     설정되어 있으면 이메일 발송.
+    #   - BRIEFING_PUBLISH_ISSUE 기본값: 이메일 활성화 시 "0" (Issue 미생성),
+    #     아니면 "1" (Issue 생성). 명시적 지정이 우선.
     email_enabled = emailer.is_configured()
     publish_issue_default = "0" if email_enabled else "1"
     publish_issue = os.getenv("BRIEFING_PUBLISH_ISSUE", publish_issue_default) == "1"
+
+    channels = []
+    if email_enabled:
+        channels.append("email")
+    if publish_issue:
+        channels.append("github_issue")
+    log.info(
+        "Step 3/3: delivering briefing via %s (relevant=%d, total_new=%d, errors=%d)",
+        "+".join(channels) if channels else "(none)",
+        len(article_briefings),
+        sum(len(v) for v in all_new_titles.values()),
+        len(scrape_result.errors),
+    )
 
     delivered_any = False
     issue_ok = True

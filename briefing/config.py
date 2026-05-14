@@ -10,14 +10,23 @@ KST = ZoneInfo("Asia/Seoul")
 
 ROOT = Path(__file__).resolve().parent.parent
 STORAGE_DIR = ROOT / "data"
-HIKOREA_FILE_DIR = STORAGE_DIR / "hikorea_files"
 DB_PATH = STORAGE_DIR / "state.sqlite3"
 
 KEYWORDS: tuple[str, ...] = (
+    # 핵심 카테고리
     "이민", "비자", "사증", "외국인", "출입국", "입국",
     "국적", "체류", "영주", "귀화", "난민", "이주",
+    # 학업·노동·관광 채널
     "유학생", "고용허가", "계절근로자", "워킹홀리데이",
-    "전자여행허가", "K-ETA", "재외동포",
+    "전자여행허가", "K-ETA",
+    # 동포·재외국민
+    "재외동포", "재외국민",
+    # 다문화·사회통합 — 이민 정책 직접 인접어
+    "다문화", "사회통합", "KIIP",
+    # 인재 비자 정책 (디지털/과학기술 인재 유치 기조)
+    "인재유치", "우수인재", "고급인재",
+    # 비자 분류 코드 — 본문이 코드만 쓰는 경우 (E-9 고용허가 등은 위 키워드로 cover)
+    "E-7", "F-2", "F-4", "F-5", "F-6", "D-8", "D-10",
 )
 
 # 브리핑 윈도우: 매일 [어제 09:30 KST, 오늘 09:30 KST] 24시간 구간을 센싱.
@@ -108,13 +117,21 @@ SITES: tuple[Site, ...] = (
         name="하이코리아",
         list_url="https://www.hikorea.go.kr/board/BoardNtcListR.pt?BBS_GB_CD=BS10",
         base_url="https://www.hikorea.go.kr",
-        # 하이코리아 공지사항 — 정부 통합 CMS와 다른 자체 시스템.
-        # 행/링크/날짜 셀렉터는 사이트 점검 후 diagnose 모드로 보정.
-        row_selector="table.board_list tbody tr, div.board_list table tbody tr, table tbody tr",
-        title_link_selector="td.title a, td.subject a, td a[href*='BoardNtcDetail']",
-        date_selector="td.date, td.regdate",
-        detail_content_selector="div.board_view, div.viewbox, div.content",
-        requires_js=True,
+        # 하이코리아 공지사항 — 자체 시스템. diagnose 결과 기반 셀렉터.
+        # 행: <tr class="board_line"> (검색 폼 테이블 제외용 클래스).
+        # 링크: 5번째 td 안의 <a> 가 javascript:void(0) + onclick="boardDetailR('NNN')" 패턴.
+        # 날짜: 마지막 td (YYYY-MM-DD 텍스트).
+        row_selector="tr.board_line",
+        title_link_selector="td a[onclick*='boardDetailR']",
+        date_selector="td:last-child",
+        detail_content_selector="div.board_view, div.viewbox, div.contents",
+        onclick_id_pattern=r"boardDetailR\('?(\d+)'?\)",
+        view_url_template=(
+            "https://www.hikorea.go.kr/board/BoardNtcDetailR.pt?"
+            "BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ={id}&page=1"
+        ),
+        # 정적 HTML 에 모든 row 데이터가 직접 들어 있어 Playwright 불필요.
+        requires_js=False,
     ),
 )
 
@@ -146,32 +163,9 @@ _MSIT_SITE = Site(
 )
 
 
-@dataclass(frozen=True)
-class HikoreaTarget:
-    """하이코리아 공지사항 게시글 — 첨부파일이 갱신되는 페이지를 추적."""
-
-    label: str
-    url: str
-    bbs_seq: int
-    notice_seq: int
-
-
-HIKOREA_TARGETS: tuple[HikoreaTarget, ...] = (
-    HikoreaTarget(
-        label="체류관리지침",
-        url="https://www.hikorea.go.kr/board/BoardNtcDetailR.pt"
-        "?BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ=1062&page=1",
-        bbs_seq=1,
-        notice_seq=1062,
-    ),
-)
-HIKOREA_BASE = "https://www.hikorea.go.kr"
-
-
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "1024"))
 
 
 def ensure_dirs() -> None:
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-    HIKOREA_FILE_DIR.mkdir(parents=True, exist_ok=True)

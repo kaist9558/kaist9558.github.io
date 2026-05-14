@@ -5,7 +5,6 @@
 # Briefing runtime data — committed to a separate workflow artifact instead
 data/state.sqlite3
 data/state.sqlite3-journal
-data/hikorea_files/
 
 # Python
 __pycache__/

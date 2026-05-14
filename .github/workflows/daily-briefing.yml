@@ -54,9 +54,7 @@ jobs:
       - name: Restore briefing state cache
         uses: actions/cache@v4
         with:
-          path: |
-            data/state.sqlite3
-            data/hikorea_files
+          path: data/state.sqlite3
           # Cache key bumps on every run; previous run's cache restored on miss.
           key: briefing-state-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
@@ -103,7 +101,6 @@ jobs:
           name: briefing-state-${{ github.run_id }}
           path: |
             data/state.sqlite3
-            data/hikorea_files/
             data/diagnose/
           retention-days: 30
           if-no-files-found: ignore

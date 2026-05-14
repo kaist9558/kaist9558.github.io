@@ -23,21 +23,8 @@ class ArticleBriefing:
     published: datetime | None
 
 
-@dataclass
-class HikoreaBriefing:
-    target_label: str
-    file_name: str
-    page_url: str
-    change_summary: str
-    is_new_file: bool
-
-
 def _site_order() -> list[str]:
     return [s.name for s in SITES]
-
-
-def _site_list_urls() -> dict[str, str]:
-    return {s.name: s.list_url for s in SITES}
 
 
 def render_markdown(
