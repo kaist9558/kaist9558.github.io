@@ -125,11 +125,12 @@ def render_markdown(
 
     # 추적 페이지(고정 URL 단일 글). 변경 유무와 무관하게 매일 섹션 표시 —
     # 수신자가 페이지 존재·접근성을 매일 확인할 수 있도록.
-    # 현재 추적 대상이 모두 하이코리아 공지사항 게시판 글이라 섹션명도 이에 맞춤.
+    # SITES 의 '하이코리아 공지사항' (게시판 목록) 과 라벨 충돌을 피하기 위해
+    # 단일 글 추적 섹션은 콘텐츠 성격으로 명명: '사증 및 체류'.
     if TRACKED_PAGES:
         lines.append("---")
         lines.append("")
-        lines.append("## 🔔 하이코리아 공지사항")
+        lines.append("## 🔔 사증 및 체류")
         lines.append("")
         changes_by_label = {tc.label: tc for tc in (tracked_changes or [])}
         for page in TRACKED_PAGES:
