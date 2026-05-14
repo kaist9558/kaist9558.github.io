@@ -84,11 +84,11 @@ class Site:
 
 
 # 신규 보도자료 수집 소스 — 정부 통합 CMS 2곳.
-#   - 법무부 보도자료 / 출입국·외국인정책본부 보도자료
-#     (artclLinkView / _artclTd* / _articleTable 셀렉터 공유)
-# 하이코리아는 별도 채널: 공지사항 게시판 LIST 가 아니라 단일 '체류관리지침' 페이지의
-# 첨부 갱신만 추적하므로 SITES 가 아닌 TRACKED_PAGES 에 정의. (LIST 페이지의 운영성
-# 공지는 '보도자료' 가 아닌데 라벨이 충돌해 혼동을 일으켜 제외.)
+#   - 법무부 보도자료      : moj.go.kr/moj/221
+#   - 하이코리아 보도자료   : immigration.go.kr/immigration/1502
+#                            (하이코리아 메뉴의 '보도자료' 가 이 URL 로 외부 링크)
+#     공통 셀렉터: artclLinkView / _artclTd* / _articleTable
+# 하이코리아 공지사항(체류관리지침 단일 글)은 SITES 가 아니라 TRACKED_PAGES 에서 추적.
 # 셀렉터는 사이트 진단 결과(`python -m briefing.diagnose`) 기반으로 보정 가능.
 SITES: tuple[Site, ...] = (
     Site(
@@ -101,7 +101,7 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        name="출입국·외국인정책본부 보도자료",
+        name="하이코리아 보도자료",
         list_url="https://www.immigration.go.kr/immigration/1502/subview.do",
         base_url="https://www.immigration.go.kr",
         row_selector="div._articleTable table tbody tr, table tbody tr",
