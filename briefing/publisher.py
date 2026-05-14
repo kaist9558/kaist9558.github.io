@@ -59,23 +59,21 @@ def render_markdown(
     for a in articles:
         articles_by_site.setdefault(a.site, []).append(a)
 
-    # 본문(오늘의 핵심 / 새 글 전체) 에서는 URL을 빼고 제목 + 요약만 노출.
-    # 모든 출처 URL은 페이지 끝의 fenced code block 으로 모아 별도 섹션에 게재한다.
-    # 기업 메일 보안 gateway 의 URL sandbox/평판 검사 + AV 휴리스틱이 "본문 클릭 링크"
-    # 가 아니라 "문서 안 인용물"로 분류해 가중치를 크게 낮추도록 함.
-    # 트레이드오프: 직접 클릭 불가. 본문 식별자(번호)로 하단 링크와 대응.
-    citations: list[tuple[str, str, str]] = []  # (site, title, url)
-
+    # 각 항목 바로 아래에 URL 을 plain text 줄로 표기 → 수신자가 복사·붙여넣기로
+    # 즉시 열 수 있음. Markdown 링크 문법은 쓰지 않아 "anchor 미스매치" 휴리스틱은
+    # 회피 (visible text == href). 메일 클라이언트는 plain URL 을 자동 인식해
+    # 클릭 가능하게 렌더하는 경우가 많지만, 보안 gateway 가 본문 링크를 차단해도
+    # 텍스트로는 그대로 보이므로 복사 경로는 항상 유효.
     for name in site_order:
         lines.append(f"### {name}")
         lines.append("")
         site_articles = articles_by_site.get(name, [])
         if site_articles:
             for a in site_articles:
-                citations.append((name, a.title, a.url))
-                cite_num = len(citations)
                 summary = (a.summary or "").strip() or "(요약 없음)"
-                lines.append(f"> **{a.title}**  [#{cite_num}]")
+                lines.append(f"> **{a.title}**")
+                lines.append(">")
+                lines.append(f"> {a.url}")
                 lines.append(">")
                 for sline in summary.splitlines():
                     sline = sline.strip()
@@ -98,31 +96,11 @@ def render_markdown(
         lines.append("")
         if entries:
             for idx, (t, u) in enumerate(entries, start=1):
-                citations.append((name, t, u))
-                cite_num = len(citations)
-                lines.append(f"{idx}. {t}  [#{cite_num}]")
+                lines.append(f"{idx}. {t}")
+                lines.append(f"   {u}")
+                lines.append("")
         else:
             lines.append("_새 글 없음_")
-        lines.append("")
-
-    # 모든 출처 URL을 fenced code block 으로 묶어 출력 — 본문 외 영역으로 격리.
-    if citations:
-        lines.append("---")
-        lines.append("")
-        lines.append("## 🔗 출처 URL")
-        lines.append("")
-        lines.append(
-            "본문 항목의 [#번호] 와 아래 목록이 1:1 매핑됩니다. "
-            "사내 메일 보안 정책으로 본문에서 직접 클릭이 어려운 경우, "
-            "필요한 URL을 복사해 외부망 브라우저에 붙여 넣어 열어 주세요."
-        )
-        lines.append("")
-        lines.append("```")
-        for i, (cite_site, cite_title, cite_url) in enumerate(citations, start=1):
-            lines.append(f"[#{i}] [{cite_site}] {cite_title}")
-            lines.append(f"     {cite_url}")
-            lines.append("")
-        lines.append("```")
         lines.append("")
 
     if scrape_errors:
