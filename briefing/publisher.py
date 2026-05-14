@@ -7,7 +7,7 @@ from datetime import datetime
 
 import requests
 
-from .config import KST, SITES
+from .config import KST, SITES, TRACKED_PAGES
 
 log = logging.getLogger(__name__)
 
@@ -123,14 +123,25 @@ def render_markdown(
             lines.append("_새 글 없음_")
         lines.append("")
 
-    # 추적 페이지(고정 URL 단일 글) 의 첨부파일 갱신 알림.
+    # 추적 페이지(고정 URL 단일 글). 변경 유무와 무관하게 매일 섹션 표시 —
+    # 수신자가 페이지 존재·접근성을 매일 확인할 수 있도록.
     # 현재 추적 대상이 모두 하이코리아 공지사항 게시판 글이라 섹션명도 이에 맞춤.
-    if tracked_changes:
+    if TRACKED_PAGES:
         lines.append("---")
         lines.append("")
         lines.append("## 🔔 하이코리아 공지사항")
         lines.append("")
-        for tc in tracked_changes:
+        changes_by_label = {tc.label: tc for tc in (tracked_changes or [])}
+        for page in TRACKED_PAGES:
+            tc = changes_by_label.get(page.label)
+            if tc is None:
+                # 변경 없음 — 페이지만 표시.
+                lines.append(f"### [{page.label}]({page.url})")
+                lines.append("")
+                lines.append("> 변경 사항 없음")
+                lines.append("")
+                continue
+
             tag = "🆕 첫 추적" if tc.is_first else "✏️ 변경 감지"
             lines.append(f"### {tag} · [{tc.label}]({tc.url})")
             lines.append("")
