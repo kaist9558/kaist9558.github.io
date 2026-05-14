@@ -20,8 +20,9 @@ KEYWORDS: tuple[str, ...] = (
     "전자여행허가", "K-ETA", "재외동포",
 )
 
-# 브리핑 윈도우: 매일 [어제 09:30 KST, 오늘 09:30 KST) 24시간 구간을 센싱.
-# 워크플로우는 09:40 KST에 실행되어 윈도우 종료 10분 후 게시.
+# 브리핑 윈도우: 매일 [어제 09:30 KST, 오늘 09:30 KST] 24시간 구간을 센싱.
+# 워크플로우는 매일 09:30 KST (UTC 00:30, cron "30 0 * * *")에 실행되며,
+# 게시일 ≤ 당일 09:30 KST 조건을 만족하는 글만 수집한다.
 WINDOW_HOURS = int(os.getenv("WINDOW_HOURS", "24"))
 WINDOW_END_HOUR_KST = int(os.getenv("WINDOW_END_HOUR_KST", "9"))
 WINDOW_END_MINUTE_KST = int(os.getenv("WINDOW_END_MINUTE_KST", "30"))
@@ -63,10 +64,10 @@ class Site:
     requires_js: bool = False  # True면 Playwright(JsRenderer)로 페치
 
 
-# 법무부·출입국·고용노동부 — 모두 정부 통합 CMS(artclLinkView/_artclTd*/_articleTable) 사용.
-# MSIT (msit.go.kr)는 글 목록이 정적 HTML에 없고 Playwright+stealth 로도 데이터 fetch
-# 시도조차 안 함 (날짜 패턴 0개, AJAX 힌트 없음 — 비-한국 IP 차단 추정). 이민 정책
-# 기여도가 낮아 추적 대상에서 제외. 필요 시 한국 IP proxy 또는 RSS 피드로 재도입 가능.
+# 수집 소스 3개: 법무부·출입국외국인정책본부(정부 통합 CMS) + 하이코리아 공지사항.
+# 법무부/출입국은 artclLinkView/_artclTd*/_articleTable 셀렉터를 공유한다.
+# 하이코리아는 별도 게시판 시스템이며 JS 렌더링이 필요할 수 있어 requires_js=True 로 설정.
+# 셀렉터는 사이트 진단 결과(diagnose) 기반으로 보정 가능.
 SITES: tuple[Site, ...] = (
     Site(
         name="법무부",
@@ -87,15 +88,16 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        name="고용노동부",
-        list_url="https://www.moel.go.kr/news/enews/list.do",
-        base_url="https://www.moel.go.kr",
-        # 정부 통합 CMS 추정 — MOJ/Immigration과 동일 셀렉터로 1차 시도.
-        # 다르면 diagnose 결과로 보정.
-        row_selector="div._articleTable table tbody tr, table tbody tr",
-        title_link_selector="a.artclLinkView, td._artclTdTitle a",
-        date_selector="td._artclTdRdate",
-        detail_content_selector="div.artclView, div._articleTable._mojView",
+        name="하이코리아",
+        list_url="https://www.hikorea.go.kr/board/BoardNtcListR.pt?BBS_GB_CD=BS10",
+        base_url="https://www.hikorea.go.kr",
+        # 하이코리아 공지사항 — 정부 통합 CMS와 다른 자체 시스템.
+        # 행/링크/날짜 셀렉터는 사이트 점검 후 diagnose 모드로 보정.
+        row_selector="table.board_list tbody tr, div.board_list table tbody tr, table tbody tr",
+        title_link_selector="td.title a, td.subject a, td a[href*='BoardNtcDetail']",
+        date_selector="td.date, td.regdate",
+        detail_content_selector="div.board_view, div.viewbox, div.content",
+        requires_js=True,
     ),
 )
 

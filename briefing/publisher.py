@@ -7,7 +7,7 @@ from datetime import datetime
 
 import requests
 
-from .config import KST
+from .config import KST, SITES
 
 log = logging.getLogger(__name__)
 
@@ -32,65 +32,87 @@ class HikoreaBriefing:
     is_new_file: bool
 
 
-def _format_date(d: datetime | None) -> str:
-    return d.strftime("%Y-%m-%d") if d else "날짜 미상"
+def _site_order() -> list[str]:
+    return [s.name for s in SITES]
+
+
+def _site_list_urls() -> dict[str, str]:
+    return {s.name: s.list_url for s in SITES}
 
 
 def render_markdown(
     *,
     articles: list[ArticleBriefing],
-    hikorea_changes: list[HikoreaBriefing],
+    all_new_titles: dict[str, list[tuple[str, str]]] | None = None,
     scrape_errors: list[tuple[str, str]] | None = None,
-    keyword_candidates_md: str = "",
 ) -> tuple[str, str]:
-    today = datetime.now(KST).strftime("%Y-%m-%d")
+    now = datetime.now(KST)
+    today = now.strftime("%Y-%m-%d")
     title = f"[일일 브리핑] 이민·비자 정책 동향 ({today})"
 
-    lines: list[str] = [
-        f"_생성: {datetime.now(KST).strftime('%Y-%m-%d %H:%M KST')}_",
-        "",
-        "## 부처 보도자료",
-    ]
-    if articles:
-        for a in articles:
-            lines.append(f"### [{a.site}] [{a.title}]({a.url})")
-            lines.append(f"_{_format_date(a.published)}_")
-            lines.append("")
-            lines.append(a.summary)
-            lines.append("")
-    else:
-        lines.append("> 오늘 새로 감지된 관련 보도자료가 없습니다.")
-        lines.append("")
+    site_order = _site_order()
+    site_urls = _site_list_urls()
+    sources_line = " · ".join(f"[{name}]({site_urls[name]})" for name in site_order)
 
-    lines.append("## 하이코리아 공지 변경")
-    if hikorea_changes:
-        for c in hikorea_changes:
-            tag = "🆕 신규 파일" if c.is_new_file else "✏️ 변경 감지"
-            lines.append(f"### {tag} · [{c.target_label}] [{c.file_name}]({c.page_url})")
+    lines: list[str] = [
+        "# 일일 이민·비자 정책 브리핑",
+        "",
+        f"- **날짜**: {today}",
+        f"- **수집 시각**: {now.strftime('%Y-%m-%d %H:%M KST')}",
+        f"- **출처**: {sources_line}",
+        "",
+        "---",
+        "",
+        "## 📌 오늘의 핵심",
+        "",
+    ]
+
+    articles_by_site: dict[str, list[ArticleBriefing]] = {name: [] for name in site_order}
+    for a in articles:
+        articles_by_site.setdefault(a.site, []).append(a)
+
+    for name in site_order:
+        lines.append(f"### {name}")
+        lines.append("")
+        site_articles = articles_by_site.get(name, [])
+        if site_articles:
+            for a in site_articles:
+                summary = (a.summary or "").strip() or "(요약 없음)"
+                lines.append(f"> **[{a.title}]({a.url})**")
+                lines.append(">")
+                for sline in summary.splitlines():
+                    sline = sline.strip()
+                    if sline:
+                        lines.append(f"> {sline}")
+                lines.append("")
+        else:
+            lines.append("> 오늘 관련 게시물 없음")
             lines.append("")
-            lines.append("```")
-            lines.append(c.change_summary)
-            lines.append("```")
-            lines.append("")
-    else:
-        lines.append("> 하이코리아 추적 게시글에 변동 사항이 없습니다.")
+
+    lines.append("---")
+    lines.append("")
+    lines.append("## 📰 그날 올라온 새 글 전체")
+    lines.append("")
+
+    all_new_titles = all_new_titles or {}
+    for name in site_order:
+        entries = all_new_titles.get(name, [])
+        lines.append(f"### {name} ({len(entries)}건)")
+        lines.append("")
+        if entries:
+            for idx, (t, u) in enumerate(entries, start=1):
+                lines.append(f"{idx}. [{t}]({u})")
+        else:
+            lines.append("_새 글 없음_")
         lines.append("")
 
     if scrape_errors:
+        lines.append("---")
+        lines.append("")
         lines.append("## ⚠️ 모니터링 경고")
         lines.append("")
         for site, msg in scrape_errors:
             lines.append(f"- **{site}**: {msg}")
-        lines.append("")
-
-    if keyword_candidates_md:
-        lines.append("## 🧐 키워드 후보 (수동 검토 권장)")
-        lines.append("")
-        lines.append(
-            "_현재 키워드 사전엔 안 걸렸지만 정책 관련성이 의심되는 제목들입니다._"
-        )
-        lines.append("")
-        lines.append(keyword_candidates_md)
         lines.append("")
 
     return title, "\n".join(lines).rstrip() + "\n"
@@ -99,9 +121,8 @@ def render_markdown(
 def publish(
     *,
     articles: list[ArticleBriefing],
-    hikorea_changes: list[HikoreaBriefing],
+    all_new_titles: dict[str, list[tuple[str, str]]] | None = None,
     scrape_errors: list[tuple[str, str]] | None = None,
-    keyword_candidates_md: str = "",
 ) -> bool:
     repo = os.getenv("GITHUB_REPOSITORY")
     token = os.getenv("GITHUB_TOKEN")
@@ -115,9 +136,8 @@ def publish(
 
     title, body = render_markdown(
         articles=articles,
-        hikorea_changes=hikorea_changes,
+        all_new_titles=all_new_titles,
         scrape_errors=scrape_errors,
-        keyword_candidates_md=keyword_candidates_md,
     )
 
     url = f"{GITHUB_API}/repos/{repo}/issues"

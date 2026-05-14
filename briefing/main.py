@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from . import cleanup, hikorea, publisher, scraper, storage, summarizer  # noqa: E402
-from .config import ensure_dirs  # noqa: E402
+from . import cleanup, emailer, publisher, scraper, storage, summarizer  # noqa: E402
+from .config import SITES, ensure_dirs  # noqa: E402
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -22,10 +22,12 @@ log = logging.getLogger("briefing")
 def run(*, dry_run: bool = False) -> int:
     ensure_dirs()
 
+    site_names = [s.name for s in SITES]
     article_briefings: list[publisher.ArticleBriefing] = []
+    all_new_titles: dict[str, list[tuple[str, str]]] = {name: [] for name in site_names}
     seen_urls: set[tuple[str, str]] = set()
 
-    log.info("Step 1/4: scraping press releases")
+    log.info("Step 1/3: scraping press releases")
     scrape_result = scraper.fetch_all()
     log.info(
         "  fetched %d matched / %d unmatched candidates / %d errors",
@@ -34,6 +36,13 @@ def run(*, dry_run: bool = False) -> int:
         len(scrape_result.errors),
     )
 
+    # "그날 올라온 새 글 전체" — 관련성 무관하게 윈도우 내 모든 새 글을 사이트별로 모은다.
+    for art in scrape_result.articles:
+        all_new_titles.setdefault(art.site, []).append((art.title, art.url))
+    for site, title, url in scrape_result.unmatched_candidates:
+        all_new_titles.setdefault(site, []).append((title, url))
+
+    log.info("Step 2/3: classifying & summarizing immigration-relevant articles")
     with storage.connect() as conn:
         for art in scrape_result.articles:
             key = (art.site, art.url)
@@ -56,77 +65,68 @@ def run(*, dry_run: bool = False) -> int:
                 )
             )
 
-        log.info("Step 2/4: monitoring HiKorea attachments")
-        hikorea_briefings: list[publisher.HikoreaBriefing] = []
-        changes = hikorea.check_all(conn)
-        log.info("  detected %d file changes", len(changes))
-
-        for ch in changes:
-            change_summary = summarizer.summarize_diff(
-                file_name=ch.file_name,
-                old_text=ch.old_text,
-                new_text=ch.new_text,
-            )
-            hikorea_briefings.append(
-                publisher.HikoreaBriefing(
-                    target_label=ch.target_label,
-                    file_name=ch.file_name,
-                    page_url=ch.page_url,
-                    change_summary=change_summary,
-                    is_new_file=ch.old_path is None,
-                )
-            )
-
-    log.info("Step 3/4: scanning unmatched titles for keyword candidates")
-    keyword_candidates_md = ""
-    if scrape_result.unmatched_candidates:
-        keyword_candidates_md = summarizer.suggest_keywords(
-            scrape_result.unmatched_candidates
-        )
-        log.info(
-            "  keyword suggestions: %s",
-            "found" if keyword_candidates_md else "none",
-        )
-
     log.info(
-        "Step 4/4: publishing GitHub Issue (articles=%d, hikorea=%d, errors=%d, candidates=%s)",
+        "Step 3/3: publishing GitHub Issue (relevant=%d, total_new=%d, errors=%d)",
         len(article_briefings),
-        len(hikorea_briefings),
+        sum(len(v) for v in all_new_titles.values()),
         len(scrape_result.errors),
-        "yes" if keyword_candidates_md else "no",
+    )
+
+    title, body = publisher.render_markdown(
+        articles=article_briefings,
+        all_new_titles=all_new_titles,
+        scrape_errors=scrape_result.errors,
     )
 
     if dry_run:
-        title, body = publisher.render_markdown(
-            articles=article_briefings,
-            hikorea_changes=hikorea_briefings,
-            scrape_errors=scrape_result.errors,
-            keyword_candidates_md=keyword_candidates_md,
-        )
         print("=" * 60)
         print("TITLE:", title)
         print("=" * 60)
         print(body)
         return 0
 
-    ok = publisher.publish(
-        articles=article_briefings,
-        hikorea_changes=hikorea_briefings,
-        scrape_errors=scrape_result.errors,
-        keyword_candidates_md=keyword_candidates_md,
-    )
+    # 채널 선택:
+    #   BRIEFING_RECIPIENT_EMAIL + SMTP_* 가 모두 설정되면 이메일로 발송 (GitHub 식별자 미노출).
+    #   BRIEFING_PUBLISH_ISSUE 기본값: 이메일이 설정돼 있으면 "0"(Issue 미생성),
+    #   아니면 "1"(기존 동작 그대로 Issue 생성). 명시적 지정이 우선.
+    email_enabled = emailer.is_configured()
+    publish_issue_default = "0" if email_enabled else "1"
+    publish_issue = os.getenv("BRIEFING_PUBLISH_ISSUE", publish_issue_default) == "1"
 
-    # 오래된 브리핑 Issue 자동 close (기본 30일)
-    if ok:
-        try:
-            keep_days = int(os.getenv("ISSUE_KEEP_DAYS", "30"))
-            n_closed = cleanup.close_old_briefings(days=keep_days)
-            if n_closed:
-                log.info("auto-closed %d old briefing issue(s)", n_closed)
-        except Exception:  # noqa: BLE001
-            log.exception("issue cleanup failed (non-fatal)")
+    delivered_any = False
+    issue_ok = True
+    email_ok = True
 
-    return 0 if ok else 1
+    if email_enabled:
+        email_ok = emailer.send(subject=title, markdown_body=body)
+        delivered_any = delivered_any or email_ok
+
+    if publish_issue:
+        issue_ok = publisher.publish(
+            articles=article_briefings,
+            all_new_titles=all_new_titles,
+            scrape_errors=scrape_result.errors,
+        )
+        delivered_any = delivered_any or issue_ok
+
+        # 오래된 브리핑 Issue 자동 close (기본 30일) — Issue 채널을 쓸 때만 의미가 있음.
+        if issue_ok:
+            try:
+                keep_days = int(os.getenv("ISSUE_KEEP_DAYS", "30"))
+                n_closed = cleanup.close_old_briefings(days=keep_days)
+                if n_closed:
+                    log.info("auto-closed %d old briefing issue(s)", n_closed)
+            except Exception:  # noqa: BLE001
+                log.exception("issue cleanup failed (non-fatal)")
+
+    if not (email_enabled or publish_issue):
+        log.error(
+            "전송 채널이 하나도 활성화되지 않았습니다. "
+            "BRIEFING_RECIPIENT_EMAIL + SMTP_* 또는 BRIEFING_PUBLISH_ISSUE=1 중 하나 이상을 설정하세요."
+        )
+        return 1
+
+    return 0 if (issue_ok and email_ok and delivered_any) else 1
 
 
 def main() -> int:
