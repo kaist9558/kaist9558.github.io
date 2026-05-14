@@ -131,9 +131,9 @@ def render_markdown(
         )
         lines.append("")
         lines.append("```")
-        for i, (site, title, url) in enumerate(citations, start=1):
-            lines.append(f"[#{i}] [{site}] {title}")
-            lines.append(f"     {url}")
+        for i, (cite_site, cite_title, cite_url) in enumerate(citations, start=1):
+            lines.append(f"[#{i}] [{cite_site}] {cite_title}")
+            lines.append(f"     {cite_url}")
             lines.append("")
         lines.append("```")
         lines.append("")
