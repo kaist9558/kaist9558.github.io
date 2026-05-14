@@ -124,10 +124,11 @@ def render_markdown(
         lines.append("")
 
     # 추적 페이지(고정 URL 단일 글) 의 첨부파일 갱신 알림.
+    # 현재 추적 대상이 모두 하이코리아 공지사항 게시판 글이라 섹션명도 이에 맞춤.
     if tracked_changes:
         lines.append("---")
         lines.append("")
-        lines.append("## 🔔 추적 페이지 갱신")
+        lines.append("## 🔔 하이코리아 공지사항")
         lines.append("")
         for tc in tracked_changes:
             tag = "🆕 첫 추적" if tc.is_first else "✏️ 변경 감지"
