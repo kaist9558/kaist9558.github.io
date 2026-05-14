@@ -85,7 +85,7 @@ class Site:
 
 # 신규 보도자료/공지 수집 소스 3곳:
 #   1) 법무부 보도자료                       : moj.go.kr/moj/221      (정부 통합 CMS)
-#   2) 출입국외국인정책본부/하이코리아 보도자료 : immigration.go.kr/.../1502 (정부 통합 CMS)
+#   2) 출입국·외국인정책본부 보도자료         : immigration.go.kr/.../1502 (정부 통합 CMS)
 #   3) 하이코리아 공지사항                    : hikorea.go.kr/.../BoardNtcListR.pt (자체 게시판)
 # (1)(2) 공통 셀렉터: artclLinkView / _artclTd* / _articleTable
 # (3) 별도 셀렉터: tr.board_line + onclick="boardDetailR('NNN')" → view URL 직접 구성.
@@ -102,9 +102,8 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        # 발행 주체는 출입국·외국인정책본부, 하이코리아 메뉴의 '보도자료' 가 외부
-        # 링크로 이 URL 을 가리킴 — 두 명칭이 같은 출처를 가리키므로 병기.
-        name="출입국외국인정책본부/하이코리아 보도자료",
+        # 발행 주체 기준 명명. 하이코리아 메뉴의 '보도자료' 가 이 URL 로 외부 링크.
+        name="출입국·외국인정책본부 보도자료",
         list_url="https://www.immigration.go.kr/immigration/1502/subview.do",
         base_url="https://www.immigration.go.kr",
         row_selector="div._articleTable table tbody tr, table tbody tr",
