@@ -7,7 +7,7 @@ from datetime import datetime
 
 import requests
 
-from .config import KST
+from .config import KST, SITES
 
 log = logging.getLogger(__name__)
 
@@ -23,74 +23,115 @@ class ArticleBriefing:
     published: datetime | None
 
 
-@dataclass
-class HikoreaBriefing:
-    target_label: str
-    file_name: str
-    page_url: str
-    change_summary: str
-    is_new_file: bool
-
-
-def _format_date(d: datetime | None) -> str:
-    return d.strftime("%Y-%m-%d") if d else "날짜 미상"
+def _site_order() -> list[str]:
+    return [s.name for s in SITES]
 
 
 def render_markdown(
     *,
     articles: list[ArticleBriefing],
-    hikorea_changes: list[HikoreaBriefing],
+    all_new_titles: dict[str, list[tuple[str, str]]] | None = None,
     scrape_errors: list[tuple[str, str]] | None = None,
-    keyword_candidates_md: str = "",
 ) -> tuple[str, str]:
-    today = datetime.now(KST).strftime("%Y-%m-%d")
+    now = datetime.now(KST)
+    today = now.strftime("%Y-%m-%d")
     title = f"[일일 브리핑] 이민·비자 정책 동향 ({today})"
 
+    site_order = _site_order()
+    # 출처 표기는 도메인명만(서비스명) — 본문 어디서도 표시 텍스트와 href가
+    # 어긋난 anchor (기업 메일 필터의 피싱 휴리스틱 트리거)를 만들지 않는다.
+    sources_line = " · ".join(site_order)
+
     lines: list[str] = [
-        f"_생성: {datetime.now(KST).strftime('%Y-%m-%d %H:%M KST')}_",
+        "# 일일 이민·비자 정책 브리핑",
         "",
-        "## 부처 보도자료",
+        f"- **날짜**: {today}",
+        f"- **수집 시각**: {now.strftime('%Y-%m-%d %H:%M KST')}",
+        f"- **출처**: {sources_line}",
+        "",
+        "---",
+        "",
+        "## 📌 오늘의 핵심",
+        "",
     ]
-    if articles:
-        for a in articles:
-            lines.append(f"### [{a.site}] [{a.title}]({a.url})")
-            lines.append(f"_{_format_date(a.published)}_")
+
+    articles_by_site: dict[str, list[ArticleBriefing]] = {name: [] for name in site_order}
+    for a in articles:
+        articles_by_site.setdefault(a.site, []).append(a)
+
+    # 본문(오늘의 핵심 / 새 글 전체) 에서는 URL을 빼고 제목 + 요약만 노출.
+    # 모든 출처 URL은 페이지 끝의 fenced code block 으로 모아 별도 섹션에 게재한다.
+    # 기업 메일 보안 gateway 의 URL sandbox/평판 검사 + AV 휴리스틱이 "본문 클릭 링크"
+    # 가 아니라 "문서 안 인용물"로 분류해 가중치를 크게 낮추도록 함.
+    # 트레이드오프: 직접 클릭 불가. 본문 식별자(번호)로 하단 링크와 대응.
+    citations: list[tuple[str, str, str]] = []  # (site, title, url)
+
+    for name in site_order:
+        lines.append(f"### {name}")
+        lines.append("")
+        site_articles = articles_by_site.get(name, [])
+        if site_articles:
+            for a in site_articles:
+                citations.append((name, a.title, a.url))
+                cite_num = len(citations)
+                summary = (a.summary or "").strip() or "(요약 없음)"
+                lines.append(f"> **{a.title}**  [#{cite_num}]")
+                lines.append(">")
+                for sline in summary.splitlines():
+                    sline = sline.strip()
+                    if sline:
+                        lines.append(f"> {sline}")
+                lines.append("")
+        else:
+            lines.append("> 오늘 관련 게시물 없음")
             lines.append("")
-            lines.append(a.summary)
-            lines.append("")
-    else:
-        lines.append("> 오늘 새로 감지된 관련 보도자료가 없습니다.")
+
+    lines.append("---")
+    lines.append("")
+    lines.append("## 📰 그날 올라온 새 글 전체")
+    lines.append("")
+
+    all_new_titles = all_new_titles or {}
+    for name in site_order:
+        entries = all_new_titles.get(name, [])
+        lines.append(f"### {name} ({len(entries)}건)")
+        lines.append("")
+        if entries:
+            for idx, (t, u) in enumerate(entries, start=1):
+                citations.append((name, t, u))
+                cite_num = len(citations)
+                lines.append(f"{idx}. {t}  [#{cite_num}]")
+        else:
+            lines.append("_새 글 없음_")
         lines.append("")
 
-    lines.append("## 하이코리아 공지 변경")
-    if hikorea_changes:
-        for c in hikorea_changes:
-            tag = "🆕 신규 파일" if c.is_new_file else "✏️ 변경 감지"
-            lines.append(f"### {tag} · [{c.target_label}] [{c.file_name}]({c.page_url})")
+    # 모든 출처 URL을 fenced code block 으로 묶어 출력 — 본문 외 영역으로 격리.
+    if citations:
+        lines.append("---")
+        lines.append("")
+        lines.append("## 🔗 출처 URL")
+        lines.append("")
+        lines.append(
+            "본문 항목의 [#번호] 와 아래 목록이 1:1 매핑됩니다. "
+            "사내 메일 보안 정책으로 본문에서 직접 클릭이 어려운 경우, "
+            "필요한 URL을 복사해 외부망 브라우저에 붙여 넣어 열어 주세요."
+        )
+        lines.append("")
+        lines.append("```")
+        for i, (cite_site, cite_title, cite_url) in enumerate(citations, start=1):
+            lines.append(f"[#{i}] [{cite_site}] {cite_title}")
+            lines.append(f"     {cite_url}")
             lines.append("")
-            lines.append("```")
-            lines.append(c.change_summary)
-            lines.append("```")
-            lines.append("")
-    else:
-        lines.append("> 하이코리아 추적 게시글에 변동 사항이 없습니다.")
+        lines.append("```")
         lines.append("")
 
     if scrape_errors:
+        lines.append("---")
+        lines.append("")
         lines.append("## ⚠️ 모니터링 경고")
         lines.append("")
         for site, msg in scrape_errors:
             lines.append(f"- **{site}**: {msg}")
-        lines.append("")
-
-    if keyword_candidates_md:
-        lines.append("## 🧐 키워드 후보 (수동 검토 권장)")
-        lines.append("")
-        lines.append(
-            "_현재 키워드 사전엔 안 걸렸지만 정책 관련성이 의심되는 제목들입니다._"
-        )
-        lines.append("")
-        lines.append(keyword_candidates_md)
         lines.append("")
 
     return title, "\n".join(lines).rstrip() + "\n"
@@ -99,9 +140,8 @@ def render_markdown(
 def publish(
     *,
     articles: list[ArticleBriefing],
-    hikorea_changes: list[HikoreaBriefing],
+    all_new_titles: dict[str, list[tuple[str, str]]] | None = None,
     scrape_errors: list[tuple[str, str]] | None = None,
-    keyword_candidates_md: str = "",
 ) -> bool:
     repo = os.getenv("GITHUB_REPOSITORY")
     token = os.getenv("GITHUB_TOKEN")
@@ -115,9 +155,8 @@ def publish(
 
     title, body = render_markdown(
         articles=articles,
-        hikorea_changes=hikorea_changes,
+        all_new_titles=all_new_titles,
         scrape_errors=scrape_errors,
-        keyword_candidates_md=keyword_candidates_md,
     )
 
     url = f"{GITHUB_API}/repos/{repo}/issues"

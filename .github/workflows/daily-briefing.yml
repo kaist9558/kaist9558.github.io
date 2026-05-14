@@ -2,9 +2,9 @@ name: Daily Immigration Policy Briefing
 
 on:
   schedule:
-    # 한국시간 매일 09:40 = UTC 00:40
-    # 윈도우: 어제 09:30 KST ~ 오늘 09:30 KST (실행 10분 전에 종료)
-    - cron: "40 0 * * *"
+    # 한국시간 매일 09:30 = UTC 00:30
+    # 윈도우: 어제 09:30 KST ~ 오늘 09:30 KST. 게시일 ≤ 당일 09:30 KST 필터 적용.
+    - cron: "30 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -17,6 +17,11 @@ on:
         type: boolean
         required: false
         default: false
+      recipient_email:
+        description: "샘플 발송용 1회성 수신자 (비우면 BRIEFING_RECIPIENT_EMAIL secret 사용)"
+        type: string
+        required: false
+        default: ""
 
 jobs:
   run-briefing:
@@ -49,9 +54,7 @@ jobs:
       - name: Restore briefing state cache
         uses: actions/cache@v4
         with:
-          path: |
-            data/state.sqlite3
-            data/hikorea_files
+          path: data/state.sqlite3
           # Cache key bumps on every run; previous run's cache restored on miss.
           key: briefing-state-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
@@ -65,6 +68,21 @@ jobs:
           WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '9' }}
           WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '30' }}
           ISSUE_KEEP_DAYS: ${{ vars.ISSUE_KEEP_DAYS || '30' }}
+          # 이메일 채널: GitHub Issue 경유가 아닌 SMTP 로 직접 발송 → 수신자 입장에서 GitHub 흔적 0.
+          # 레거시 운영과 동일한 secret 명 재사용 (EMAIL_SENDER/EMAIL_PASSWORD/EMAIL_RECEIVER).
+          # workflow_dispatch 의 recipient_email 입력은 EMAIL_RECEIVER 를 덮어쓴다 (1회성 샘플 발송용).
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          # Resend HTTPS API (선택). 설정되면 SMTP 대신 자동 사용.
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          BRIEFING_RECIPIENT_EMAIL: ${{ github.event.inputs.recipient_email != '' && github.event.inputs.recipient_email || secrets.EMAIL_RECEIVER }}
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+          SMTP_USE_SSL: ${{ vars.SMTP_USE_SSL || '0' }}
+          SMTP_FROM_NAME: ${{ vars.SMTP_FROM_NAME || '이민·비자 정책 브리핑' }}
+          # 이메일 활성화 시 Issue 는 기본 OFF. 둘 다 보내려면 BRIEFING_PUBLISH_ISSUE=1 (var)
+          BRIEFING_PUBLISH_ISSUE: ${{ vars.BRIEFING_PUBLISH_ISSUE || '' }}
           # GITHUB_REPOSITORY is auto-set by the runner; GITHUB_TOKEN must be passed explicitly.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -83,7 +101,6 @@ jobs:
           name: briefing-state-${{ github.run_id }}
           path: |
             data/state.sqlite3
-            data/hikorea_files/
             data/diagnose/
           retention-days: 30
           if-no-files-found: ignore

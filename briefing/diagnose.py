@@ -59,7 +59,7 @@ def inspect_site(session, site: Site, js_renderer=None) -> None:
         if js_renderer is None:
             print("FETCH FAILED — JS 렌더러 미초기화")
             return
-        html = js_renderer.fetch(site.list_url)
+        html = js_renderer.fetch(site.list_url, wait_selector=site.wait_selector)
         if html is None:
             print("FETCH FAILED — JS 렌더 페이지 로드 실패")
             if getattr(js_renderer, "last_error", None):
