@@ -85,13 +85,20 @@ def run(*, dry_run: bool = False) -> int:
         return 0
 
     # 채널 선택:
-    #   - 이메일 자격 증명(EMAIL_SENDER/PASSWORD + 수신자, 또는 RESEND_API_KEY + 수신자)이
-    #     설정되어 있으면 이메일 발송.
-    #   - BRIEFING_PUBLISH_ISSUE 기본값: 이메일 활성화 시 "0" (Issue 미생성),
-    #     아니면 "1" (Issue 생성). 명시적 지정이 우선.
+    #   - 이메일 자격 증명(EMAIL_SENDER/EMAIL_PASSWORD + 수신자)이 모두 있으면 이메일 발송.
+    #   - BRIEFING_PUBLISH_ISSUE 기본값은 이메일 활성화 시 "0", 아니면 "1".
+    #     명시 지정이 우선 (예: BRIEFING_PUBLISH_ISSUE=1 로 이메일과 동시 발행 가능).
     email_enabled = emailer.is_configured()
     publish_issue_default = "0" if email_enabled else "1"
     publish_issue = os.getenv("BRIEFING_PUBLISH_ISSUE", publish_issue_default) == "1"
+
+    if not (email_enabled or publish_issue):
+        log.error(
+            "전송 채널이 하나도 활성화되지 않았습니다. "
+            "EMAIL_SENDER/EMAIL_PASSWORD + 수신자 또는 BRIEFING_PUBLISH_ISSUE=1 중 "
+            "최소 하나 이상을 설정하세요."
+        )
+        return 1
 
     channels = []
     if email_enabled:
@@ -100,20 +107,14 @@ def run(*, dry_run: bool = False) -> int:
         channels.append("github_issue")
     log.info(
         "Step 3/3: delivering briefing via %s (relevant=%d, total_new=%d, errors=%d)",
-        "+".join(channels) if channels else "(none)",
+        "+".join(channels),
         len(article_briefings),
         sum(len(v) for v in all_new_titles.values()),
         len(scrape_result.errors),
     )
 
-    delivered_any = False
+    email_ok = emailer.send(subject=title, markdown_body=body) if email_enabled else True
     issue_ok = True
-    email_ok = True
-
-    if email_enabled:
-        email_ok = emailer.send(subject=title, markdown_body=body)
-        delivered_any = delivered_any or email_ok
-
     if publish_issue:
         issue_ok = publisher.publish(
             articles=article_briefings,
@@ -121,8 +122,6 @@ def run(*, dry_run: bool = False) -> int:
             scrape_errors=scrape_result.errors,
             tracked_changes=tracked_changes,
         )
-        delivered_any = delivered_any or issue_ok
-
         # 오래된 브리핑 Issue 자동 close (기본 30일) — Issue 채널을 쓸 때만 의미가 있음.
         if issue_ok:
             try:
@@ -133,14 +132,7 @@ def run(*, dry_run: bool = False) -> int:
             except Exception:  # noqa: BLE001
                 log.exception("issue cleanup failed (non-fatal)")
 
-    if not (email_enabled or publish_issue):
-        log.error(
-            "전송 채널이 하나도 활성화되지 않았습니다. "
-            "BRIEFING_RECIPIENT_EMAIL + SMTP_* 또는 BRIEFING_PUBLISH_ISSUE=1 중 하나 이상을 설정하세요."
-        )
-        return 1
-
-    return 0 if (issue_ok and email_ok and delivered_any) else 1
+    return 0 if (email_ok and issue_ok) else 1
 
 
 def main() -> int:
@@ -148,7 +140,7 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="GitHub Issue를 생성하지 않고 본문만 출력",
+        help="발송하지 않고 본문만 stdout 출력 (이메일/Issue 양쪽 모두 skip)",
     )
     args = parser.parse_args()
     try:

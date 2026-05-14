@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Issue를 생성하지 않고 본문만 출력"
+        description: "발송하지 않고 본문만 stdout 출력"
         type: boolean
         required: false
         default: false
@@ -74,9 +74,6 @@ jobs:
           # workflow_dispatch 의 recipient_email 입력은 EMAIL_RECEIVER 를 덮어쓴다 (1회성 샘플 발송용).
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          # Resend HTTPS API (선택). 설정되면 SMTP 대신 자동 사용.
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM: ${{ secrets.RESEND_FROM }}
           BRIEFING_RECIPIENT_EMAIL: ${{ github.event.inputs.recipient_email != '' && github.event.inputs.recipient_email || secrets.EMAIL_RECEIVER }}
           SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
           SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
