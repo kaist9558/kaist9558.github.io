@@ -51,8 +51,9 @@ def render_markdown(
     title = f"[일일 브리핑] 이민·비자 정책 동향 ({today})"
 
     site_order = _site_order()
-    site_urls = _site_list_urls()
-    sources_line = " · ".join(f"[{name}]({site_urls[name]})" for name in site_order)
+    # 출처 표기는 도메인명만(서비스명) — 본문 어디서도 표시 텍스트와 href가
+    # 어긋난 anchor (기업 메일 필터의 피싱 휴리스틱 트리거)를 만들지 않는다.
+    sources_line = " · ".join(site_order)
 
     lines: list[str] = [
         "# 일일 이민·비자 정책 브리핑",
@@ -71,6 +72,9 @@ def render_markdown(
     for a in articles:
         articles_by_site.setdefault(a.site, []).append(a)
 
+    # 모든 링크는 Markdown autolink 문법(<url>)으로 통일 →
+    # 렌더링 결과의 visible text 와 href 가 동일해, 기업 메일 필터의
+    # "anchor text != href" 미스매치 휴리스틱에 걸리지 않는다.
     for name in site_order:
         lines.append(f"### {name}")
         lines.append("")
@@ -78,7 +82,9 @@ def render_markdown(
         if site_articles:
             for a in site_articles:
                 summary = (a.summary or "").strip() or "(요약 없음)"
-                lines.append(f"> **[{a.title}]({a.url})**")
+                lines.append(f"> **{a.title}**")
+                lines.append(">")
+                lines.append(f"> <{a.url}>")
                 lines.append(">")
                 for sline in summary.splitlines():
                     sline = sline.strip()
@@ -101,7 +107,9 @@ def render_markdown(
         lines.append("")
         if entries:
             for idx, (t, u) in enumerate(entries, start=1):
-                lines.append(f"{idx}. [{t}]({u})")
+                lines.append(f"{idx}. {t}")
+                lines.append(f"   <{u}>")
+                lines.append("")
         else:
             lines.append("_새 글 없음_")
         lines.append("")
