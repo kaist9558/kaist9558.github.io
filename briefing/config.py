@@ -180,7 +180,8 @@ class TrackedPage:
 
 TRACKED_PAGES: tuple[TrackedPage, ...] = (
     TrackedPage(
-        label="체류관리지침 (체류자격별 통합 안내 매뉴얼)",
+        # 하이코리아 게시글의 실제 제목과 동일하게 표기.
+        label="체류자격별 통합 안내 매뉴얼(최신)",
         url=(
             "https://www.hikorea.go.kr/board/BoardNtcDetailR.pt?"
             "BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ=1062&page=1"
