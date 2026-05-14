@@ -97,28 +97,13 @@ SITES: tuple[Site, ...] = (
         date_selector="td._artclTdRdate",
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
-    Site(
-        name="과학기술정보통신부",
-        list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
-        base_url="https://www.msit.go.kr",
-        # MSIT 보도자료: AJAX 후주입. row 컨테이너는 <div class="toggle">, header row는 .thead 클래스로 제외.
-        row_selector="div.board_list div.toggle:not(.thead)",
-        # <a href="javascript:;" onclick="fn_detail(NNN)"> wrapper.
-        title_link_selector="a[onclick*='fn_detail']",
-        # 진짜 제목 텍스트는 <a> 내부 <p class="title">.
-        title_selector="p.title",
-        date_selector="div.date",
-        detail_content_selector="div.board_view, div.view_cont, .view_wrap",
-        onclick_id_pattern=r"fn_detail\((\d+)\)",
-        view_url_template=(
-            "https://www.msit.go.kr/bbs/view.do?"
-            "sCode=user&mPid=208&mId=307&nttSeqNo={id}"
-        ),
-        # placeholder 가 채워질 때까지 대기. 첫 행의 <p class="title"> 텍스트가
-        # 빈 상태에서 채워지는 시점을 기준.
-        wait_selector="div.board_list p.title:not(:empty)",
-        requires_js=True,
-    ),
+    # ⚠️ 과학기술정보통신부(MSIT) — GitHub Actions runner 환경(비-한국 IP)에서
+    # `net::ERR_CONNECTION_RESET` 으로 서버가 TCP 연결을 능동적으로 끊습니다.
+    # 첫 페이지는 빈 placeholder 만 받고(39KB) 재시도는 즉시 reset.
+    # Playwright + stealth + 실제 Chrome UA 로도 우회되지 않음 (IP 기반 차단).
+    # 아래 Site 정의는 한국 IP proxy/GA runner 자체 변경 시 SITES tuple 에
+    # 한 줄만 살리면 즉시 부활할 수 있도록 보존. 활성화하려면 _MSIT_SITE 를
+    # SITES 안으로 옮기면 된다.
     Site(
         name="하이코리아",
         list_url="https://www.hikorea.go.kr/board/BoardNtcListR.pt?BBS_GB_CD=BS10",
@@ -131,6 +116,33 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.board_view, div.viewbox, div.content",
         requires_js=True,
     ),
+)
+
+
+# 한국 IP proxy 또는 self-hosted KR runner 가 준비되면 SITES tuple 에 추가:
+#     SITES = SITES + (_MSIT_SITE,)
+# (현재 GitHub Actions 기본 runner 에선 ERR_CONNECTION_RESET 으로 차단)
+_MSIT_SITE = Site(
+    name="과학기술정보통신부",
+    list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
+    base_url="https://www.msit.go.kr",
+    # MSIT 보도자료: AJAX 후주입. row 컨테이너는 <div class="toggle">, header row는 .thead 클래스로 제외.
+    row_selector="div.board_list div.toggle:not(.thead)",
+    # <a href="javascript:;" onclick="fn_detail(NNN)"> wrapper.
+    title_link_selector="a[onclick*='fn_detail']",
+    # 진짜 제목 텍스트는 <a> 내부 <p class="title">.
+    title_selector="p.title",
+    date_selector="div.date",
+    detail_content_selector="div.board_view, div.view_cont, .view_wrap",
+    onclick_id_pattern=r"fn_detail\((\d+)\)",
+    view_url_template=(
+        "https://www.msit.go.kr/bbs/view.do?"
+        "sCode=user&mPid=208&mId=307&nttSeqNo={id}"
+    ),
+    # placeholder 가 채워질 때까지 대기. 첫 행의 <p class="title"> 텍스트가
+    # 빈 상태에서 채워지는 시점을 기준.
+    wait_selector="div.board_list p.title:not(:empty)",
+    requires_js=True,
 )
 
 
