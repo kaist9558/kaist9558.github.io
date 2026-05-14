@@ -83,10 +83,11 @@ class Site:
     wait_selector: str | None = None
 
 
-# 수집 소스 3개: 법무부·출입국외국인정책본부(정부 통합 CMS) + 하이코리아 공지사항.
-# 법무부/출입국은 artclLinkView/_artclTd*/_articleTable 셀렉터를 공유한다.
-# 하이코리아는 별도 게시판 시스템이며 JS 렌더링이 필요할 수 있어 requires_js=True 로 설정.
-# 셀렉터는 사이트 진단 결과(diagnose) 기반으로 보정 가능.
+# 수집 소스 3개:
+#   - 법무부 보도자료 / 출입국·외국인정책본부 보도자료 — 정부 통합 CMS
+#     (artclLinkView / _artclTd* / _articleTable 셀렉터 공유)
+#   - 하이코리아 공지사항 — 자체 게시판 시스템 (boardDetailR onclick 패턴, 정적 HTML)
+# 셀렉터는 사이트 진단 결과(`python -m briefing.diagnose`) 기반으로 보정 가능.
 SITES: tuple[Site, ...] = (
     Site(
         name="법무부 보도자료",
@@ -106,20 +107,13 @@ SITES: tuple[Site, ...] = (
         date_selector="td._artclTdRdate",
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
-    # ⚠️ 과학기술정보통신부(MSIT) — GitHub Actions runner 환경(비-한국 IP)에서
-    # `net::ERR_CONNECTION_RESET` 으로 서버가 TCP 연결을 능동적으로 끊습니다.
-    # 첫 페이지는 빈 placeholder 만 받고(39KB) 재시도는 즉시 reset.
-    # Playwright + stealth + 실제 Chrome UA 로도 우회되지 않음 (IP 기반 차단).
-    # 아래 Site 정의는 한국 IP proxy/GA runner 자체 변경 시 SITES tuple 에
-    # 한 줄만 살리면 즉시 부활할 수 있도록 보존. 활성화하려면 _MSIT_SITE 를
-    # SITES 안으로 옮기면 된다.
     Site(
         name="하이코리아 공지사항",
         list_url="https://www.hikorea.go.kr/board/BoardNtcListR.pt?BBS_GB_CD=BS10",
         base_url="https://www.hikorea.go.kr",
-        # 하이코리아 공지사항 — 자체 시스템. diagnose 결과 기반 셀렉터.
         # 행: <tr class="board_line"> (검색 폼 테이블 제외용 클래스).
-        # 링크: 5번째 td 안의 <a> 가 javascript:void(0) + onclick="boardDetailR('NNN')" 패턴.
+        # 링크: javascript:void(0) + onclick="boardDetailR('NNN')" 패턴
+        #       → onclick_id_pattern + view_url_template 으로 view URL 직접 구성.
         # 날짜: 마지막 td (YYYY-MM-DD 텍스트).
         row_selector="tr.board_line",
         title_link_selector="td a[onclick*='boardDetailR']",
@@ -130,15 +124,16 @@ SITES: tuple[Site, ...] = (
             "https://www.hikorea.go.kr/board/BoardNtcDetailR.pt?"
             "BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ={id}&page=1"
         ),
-        # 정적 HTML 에 모든 row 데이터가 직접 들어 있어 Playwright 불필요.
-        requires_js=False,
     ),
 )
 
 
-# 한국 IP proxy 또는 self-hosted KR runner 가 준비되면 SITES tuple 에 추가:
-#     SITES = SITES + (_MSIT_SITE,)
-# (현재 GitHub Actions 기본 runner 에선 ERR_CONNECTION_RESET 으로 차단)
+# ⚠️ 과학기술정보통신부(MSIT) — GitHub Actions runner 환경(비-한국 IP)에서
+# `net::ERR_CONNECTION_RESET` 으로 서버가 TCP 연결을 능동적으로 끊습니다.
+# 첫 페이지는 빈 placeholder 만 받고(39KB) 재시도는 즉시 reset.
+# Playwright + stealth + 실제 Chrome UA 로도 우회되지 않음 (IP 기반 차단).
+# 아래 Site 정의는 한국 IP proxy / self-hosted KR runner 가 준비되면
+# `SITES = SITES + (_MSIT_SITE,)` 한 줄로 즉시 활성화할 수 있도록 보존.
 _MSIT_SITE = Site(
     name="과학기술정보통신부",
     list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
