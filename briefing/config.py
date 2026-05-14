@@ -89,7 +89,7 @@ class Site:
 # 셀렉터는 사이트 진단 결과(diagnose) 기반으로 보정 가능.
 SITES: tuple[Site, ...] = (
     Site(
-        name="법무부",
+        name="법무부 보도자료",
         list_url="https://www.moj.go.kr/moj/221/subview.do",
         base_url="https://www.moj.go.kr",
         row_selector="div._articleTable table tbody tr, table tbody tr",
@@ -98,7 +98,7 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        name="출입국·외국인정책본부",
+        name="출입국·외국인정책본부 보도자료",
         list_url="https://www.immigration.go.kr/immigration/1502/subview.do",
         base_url="https://www.immigration.go.kr",
         row_selector="div._articleTable table tbody tr, table tbody tr",
@@ -114,7 +114,7 @@ SITES: tuple[Site, ...] = (
     # 한 줄만 살리면 즉시 부활할 수 있도록 보존. 활성화하려면 _MSIT_SITE 를
     # SITES 안으로 옮기면 된다.
     Site(
-        name="하이코리아",
+        name="하이코리아 공지사항",
         list_url="https://www.hikorea.go.kr/board/BoardNtcListR.pt?BBS_GB_CD=BS10",
         base_url="https://www.hikorea.go.kr",
         # 하이코리아 공지사항 — 자체 시스템. diagnose 결과 기반 셀렉터.
@@ -160,6 +160,32 @@ _MSIT_SITE = Site(
     # 빈 상태에서 채워지는 시점을 기준.
     wait_selector="div.board_list p.title:not(:empty)",
     requires_js=True,
+)
+
+
+@dataclass(frozen=True)
+class TrackedPage:
+    """게시판 목록이 아니라 '단일 글 페이지'의 첨부파일 갱신만 추적.
+
+    예: 하이코리아 체류관리지침처럼 글 URL은 고정인데 첨부 PDF/HWP 가
+    교체되는 페이지. 페이지의 apndList hidden field 또는 첨부 링크
+    영역을 해시해 비교한다."""
+
+    label: str
+    url: str
+    # 변경 신호 추출 규칙. 기본은 apndList hidden field (하이코리아 게시판 패턴).
+    # 다른 사이트면 별도 추출 regex 를 줘서 재사용 가능.
+    signal_pattern: str = r'name="apndList"[^>]*value="([^"]*)"'
+
+
+TRACKED_PAGES: tuple[TrackedPage, ...] = (
+    TrackedPage(
+        label="체류관리지침 (체류자격별 통합 안내 매뉴얼)",
+        url=(
+            "https://www.hikorea.go.kr/board/BoardNtcDetailR.pt?"
+            "BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ=1062&page=1"
+        ),
+    ),
 )
 
 
