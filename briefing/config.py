@@ -83,10 +83,12 @@ class Site:
     wait_selector: str | None = None
 
 
-# 수집 소스 3개:
-#   - 법무부 보도자료 / 출입국·외국인정책본부 보도자료 — 정부 통합 CMS
-#     (artclLinkView / _artclTd* / _articleTable 셀렉터 공유)
-#   - 하이코리아 공지사항 — 자체 게시판 시스템 (boardDetailR onclick 패턴, 정적 HTML)
+# 신규 보도자료 수집 소스 — 정부 통합 CMS 2곳.
+#   - 법무부 보도자료      : moj.go.kr/moj/221
+#   - 하이코리아 보도자료   : immigration.go.kr/immigration/1502
+#                            (하이코리아 메뉴의 '보도자료' 가 이 URL 로 외부 링크)
+#     공통 셀렉터: artclLinkView / _artclTd* / _articleTable
+# 하이코리아 공지사항(체류관리지침 단일 글)은 SITES 가 아니라 TRACKED_PAGES 에서 추적.
 # 셀렉터는 사이트 진단 결과(`python -m briefing.diagnose`) 기반으로 보정 가능.
 SITES: tuple[Site, ...] = (
     Site(
@@ -99,31 +101,13 @@ SITES: tuple[Site, ...] = (
         detail_content_selector="div.artclView, div._articleTable._mojView",
     ),
     Site(
-        name="출입국·외국인정책본부 보도자료",
+        name="하이코리아 보도자료",
         list_url="https://www.immigration.go.kr/immigration/1502/subview.do",
         base_url="https://www.immigration.go.kr",
         row_selector="div._articleTable table tbody tr, table tbody tr",
         title_link_selector="a.artclLinkView, td._artclTdTitle a",
         date_selector="td._artclTdRdate",
         detail_content_selector="div.artclView, div._articleTable._mojView",
-    ),
-    Site(
-        name="하이코리아 공지사항",
-        list_url="https://www.hikorea.go.kr/board/BoardNtcListR.pt?BBS_GB_CD=BS10",
-        base_url="https://www.hikorea.go.kr",
-        # 행: <tr class="board_line"> (검색 폼 테이블 제외용 클래스).
-        # 링크: javascript:void(0) + onclick="boardDetailR('NNN')" 패턴
-        #       → onclick_id_pattern + view_url_template 으로 view URL 직접 구성.
-        # 날짜: 마지막 td (YYYY-MM-DD 텍스트).
-        row_selector="tr.board_line",
-        title_link_selector="td a[onclick*='boardDetailR']",
-        date_selector="td:last-child",
-        detail_content_selector="div.board_view, div.viewbox, div.contents",
-        onclick_id_pattern=r"boardDetailR\('?(\d+)'?\)",
-        view_url_template=(
-            "https://www.hikorea.go.kr/board/BoardNtcDetailR.pt?"
-            "BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ={id}&page=1"
-        ),
     ),
 )
 
