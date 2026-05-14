@@ -62,6 +62,16 @@ class Site:
     detail_content_selector: str
     encoding: str | None = None
     requires_js: bool = False  # True면 Playwright(JsRenderer)로 페치
+    # title_link_selector 가 가리키는 element 안에 제목 외 텍스트(부서/담당자 등)가
+    # 섞여 있는 사이트(예: MSIT)는 별도 selector 로 제목 텍스트만 추출.
+    title_selector: str | None = None
+    # 일부 사이트는 <a href="javascript:;" onclick="fn_detail(NNN)"> 형태로 SPA 라우팅.
+    # onclick 패턴에서 ID를 뽑아 view URL 을 직접 만들어야 한다.
+    onclick_id_pattern: str | None = None      # e.g., r"fn_detail\((\d+)\)"
+    view_url_template: str | None = None       # e.g., "{base}/bbs/view.do?...&nttSeqNo={id}"
+    # AJAX 로 행 데이터가 채워지는 사이트 — Playwright 가 이 selector 가 비어있지 않을
+    # 때까지 추가 대기.
+    wait_selector: str | None = None
 
 
 # 수집 소스 3개: 법무부·출입국외국인정책본부(정부 통합 CMS) + 하이코리아 공지사항.
@@ -86,6 +96,28 @@ SITES: tuple[Site, ...] = (
         title_link_selector="a.artclLinkView, td._artclTdTitle a",
         date_selector="td._artclTdRdate",
         detail_content_selector="div.artclView, div._articleTable._mojView",
+    ),
+    Site(
+        name="과학기술정보통신부",
+        list_url="https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307",
+        base_url="https://www.msit.go.kr",
+        # MSIT 보도자료: AJAX 후주입. row 컨테이너는 <div class="toggle">, header row는 .thead 클래스로 제외.
+        row_selector="div.board_list div.toggle:not(.thead)",
+        # <a href="javascript:;" onclick="fn_detail(NNN)"> wrapper.
+        title_link_selector="a[onclick*='fn_detail']",
+        # 진짜 제목 텍스트는 <a> 내부 <p class="title">.
+        title_selector="p.title",
+        date_selector="div.date",
+        detail_content_selector="div.board_view, div.view_cont, .view_wrap",
+        onclick_id_pattern=r"fn_detail\((\d+)\)",
+        view_url_template=(
+            "https://www.msit.go.kr/bbs/view.do?"
+            "sCode=user&mPid=208&mId=307&nttSeqNo={id}"
+        ),
+        # placeholder 가 채워질 때까지 대기. 첫 행의 <p class="title"> 텍스트가
+        # 빈 상태에서 채워지는 시점을 기준.
+        wait_selector="div.board_list p.title:not(:empty)",
+        requires_js=True,
     ),
     Site(
         name="하이코리아",

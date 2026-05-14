@@ -123,16 +123,30 @@ def _parse_list(
 
     for row in rows[:max_rows]:
         link = _select_first(row, site.title_link_selector)
-        if not link or not link.get("href"):
+        if not link:
             continue
-        title = link.get_text(" ", strip=True)
+
+        # 제목 추출 — 별도 selector 가 정의된 경우(MSIT 등) 우선, 없으면 link 자체.
+        if site.title_selector:
+            title_el = _select_first(row, site.title_selector)
+            title = title_el.get_text(" ", strip=True) if title_el else ""
+        else:
+            title = link.get_text(" ", strip=True)
         if not title:
             continue
 
-        href = link["href"]
-        if href.lower().startswith("javascript:"):
+        href = link.get("href") or ""
+        url: str | None = None
+        if href and not href.lower().startswith("javascript:"):
+            url = urljoin(site.base_url + "/", href)
+        elif site.onclick_id_pattern and site.view_url_template:
+            # SPA 라우팅 사이트(MSIT): onclick="fn_detail(ID)" → view URL 직접 구성
+            onclick = link.get("onclick") or ""
+            m = re.search(site.onclick_id_pattern, onclick)
+            if m:
+                url = site.view_url_template.format(id=m.group(1), base=site.base_url)
+        if not url:
             continue
-        url = urljoin(site.base_url + "/", href)
 
         published = _extract_date(row, site.date_selector)
         if published:
@@ -176,7 +190,7 @@ def fetch_articles(session, site: Site, *, max_rows: int = 15, js_renderer=None)
                 (site.name, "JS 렌더러 미초기화 — fetch_all 경로로 호출하세요")
             )
             return result
-        list_html = js_renderer.fetch(site.list_url)
+        list_html = js_renderer.fetch(site.list_url, wait_selector=site.wait_selector)
         if list_html is None:
             result = ScrapeResult()
             result.errors.append((site.name, "JS 렌더 목록 페이지 로드 실패"))
