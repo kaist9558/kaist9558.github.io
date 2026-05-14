@@ -27,6 +27,18 @@ def _site_order() -> list[str]:
     return [s.name for s in SITES]
 
 
+def _site_list_urls() -> dict[str, str]:
+    return {s.name: s.list_url for s in SITES}
+
+
+def _site_header(name: str, url: str | None) -> str:
+    """### 섹션 헤더 — 사이트 목록 URL 이 있으면 markdown 링크로 감싼다.
+    상세 article URL과 달리 list URL 은 게시판 첫 페이지라 기업 메일 보안 게이트
+    웨이의 평판 검사에 잘 걸리지 않음. 사용자가 직접 클릭해 "정말 관련 글이 없는지"
+    크로스체크 가능."""
+    return f"### [{name}]({url})" if url else f"### {name}"
+
+
 def render_markdown(
     *,
     articles: list[ArticleBriefing],
@@ -38,6 +50,7 @@ def render_markdown(
     title = f"[일일 브리핑] 이민·비자 정책 동향 ({today})"
 
     site_order = _site_order()
+    site_urls = _site_list_urls()
     # 출처 표기는 도메인명만(서비스명) — 본문 어디서도 표시 텍스트와 href가
     # 어긋난 anchor (기업 메일 필터의 피싱 휴리스틱 트리거)를 만들지 않는다.
     sources_line = " · ".join(site_order)
@@ -65,7 +78,7 @@ def render_markdown(
     # 클릭 가능하게 렌더하는 경우가 많지만, 보안 gateway 가 본문 링크를 차단해도
     # 텍스트로는 그대로 보이므로 복사 경로는 항상 유효.
     for name in site_order:
-        lines.append(f"### {name}")
+        lines.append(_site_header(name, site_urls.get(name)))
         lines.append("")
         site_articles = articles_by_site.get(name, [])
         if site_articles:
@@ -92,7 +105,13 @@ def render_markdown(
     all_new_titles = all_new_titles or {}
     for name in site_order:
         entries = all_new_titles.get(name, [])
-        lines.append(f"### {name} ({len(entries)}건)")
+        # 섹션 헤더에 사이트 list URL 하이퍼링크 + 건수 표기.
+        url = site_urls.get(name)
+        header_label = f"{name} ({len(entries)}건)"
+        if url:
+            lines.append(f"### [{header_label}]({url})")
+        else:
+            lines.append(f"### {header_label}")
         lines.append("")
         if entries:
             for idx, (t, u) in enumerate(entries, start=1):
