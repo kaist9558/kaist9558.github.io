@@ -100,7 +100,7 @@ def render_markdown(
 
     lines.append("---")
     lines.append("")
-    lines.append("## 📰 그날 올라온 새 글 전체")
+    lines.append("## 📰 신규 보도자료 전체")
     lines.append("")
 
     all_new_titles = all_new_titles or {}
