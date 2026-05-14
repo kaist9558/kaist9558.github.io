@@ -30,8 +30,8 @@ Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
 
 DEFAULT_GOTO_TIMEOUT_MS = 60_000
 NETWORK_IDLE_TIMEOUT_MS = 40_000  # 추가 AJAX가 늦게 오는 KR gov SPA 대응
-WAIT_SELECTOR_TIMEOUT_MS = 10_000
-POST_IDLE_GRACE_MS = 3_000  # networkidle 후에도 다음 XHR 한 번 더 기다림
+WAIT_SELECTOR_TIMEOUT_MS = 30_000  # KR gov 사이트는 AJAX placeholder fill이 느릴 수 있음
+POST_IDLE_GRACE_MS = 5_000  # networkidle 후에도 다음 XHR 한 번 더 기다림
 
 
 class JsRenderer:
