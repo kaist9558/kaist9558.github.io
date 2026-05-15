@@ -2,10 +2,11 @@ name: Daily Immigration Policy Briefing
 
 on:
   schedule:
-    # 한국시간 매일 10:00 = UTC 01:00
-    # 윈도우: 어제 10:00 KST ~ 오늘 10:00 KST. 게시일 ≤ 당일 10:00 KST 필터 적용.
-    # 스크레이프·요약 완료 즉시 메일 발송 (정상 환경에서 ~10:01~10:02 KST 도착).
-    - cron: "0 1 * * *"
+    # 한국시간 매일 09:00 = UTC 00:00
+    # 윈도우: 어제 09:00 KST ~ 오늘 09:00 KST. 게시일 ≤ 당일 09:00 KST 필터 적용.
+    # 스크레이프·요약 완료 즉시 메일 발송 (정상 환경에서 ~09:01~09:02 KST 도착).
+    # 단, GitHub Actions 무료 cron 은 평균 ~3시간 지연되므로 실제론 KST 12시 무렵 도착할 수 있음.
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -66,7 +67,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
           WINDOW_HOURS: ${{ vars.WINDOW_HOURS || '24' }}
-          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '10' }}
+          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '9' }}
           WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '0' }}
           ISSUE_KEEP_DAYS: ${{ vars.ISSUE_KEEP_DAYS || '30' }}
           # 이메일 채널: GitHub Issue 경유가 아닌 SMTP 로 직접 발송 → 수신자 입장에서 GitHub 흔적 0.
