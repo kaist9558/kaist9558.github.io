@@ -29,11 +29,11 @@ KEYWORDS: tuple[str, ...] = (
     "E-7", "F-2", "F-4", "F-5", "F-6", "D-8", "D-10",
 )
 
-# 브리핑 윈도우: 매일 [어제 10:00 KST, 오늘 10:00 KST] 24시간 구간을 센싱.
-# 워크플로우는 매일 10:00 KST (UTC 01:00, cron "0 1 * * *")에 실행되며,
-# 게시일 ≤ 당일 10:00 KST 조건을 만족하는 글만 수집해 즉시 발송.
+# 브리핑 윈도우: 매일 [어제 09:00 KST, 오늘 09:00 KST] 24시간 구간을 센싱.
+# 워크플로우는 매일 09:00 KST (UTC 00:00, cron "0 0 * * *")에 실행되며,
+# 게시일 ≤ 당일 09:00 KST 조건을 만족하는 글만 수집해 즉시 발송.
 WINDOW_HOURS = int(os.getenv("WINDOW_HOURS", "24"))
-WINDOW_END_HOUR_KST = int(os.getenv("WINDOW_END_HOUR_KST", "10"))
+WINDOW_END_HOUR_KST = int(os.getenv("WINDOW_END_HOUR_KST", "9"))
 WINDOW_END_MINUTE_KST = int(os.getenv("WINDOW_END_MINUTE_KST", "0"))
 
 
