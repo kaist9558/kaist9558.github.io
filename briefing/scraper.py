@@ -16,6 +16,11 @@ log = logging.getLogger(__name__)
 
 DATE_RE = re.compile(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})")
 
+# 정부 통합 CMS(법무부·출입국 등)는 신규 게시글에 <span class="newArtcl">새글작성</span>
+# 배지를 제목 링크 안에 박아둔다. get_text 시 제목 뒤에 "새글작성" 이 딸려오므로
+# row 단계에서 미리 제거. 다른 보조 배지 클래스가 추가되면 셀렉터에 콤마로 잇는다.
+TITLE_BADGE_SELECTOR = "span.newArtcl"
+
 
 @dataclass
 class Article:
@@ -122,6 +127,9 @@ def _parse_list(
     latest_date = window_end.date()
 
     for row in rows[:max_rows]:
+        for badge in row.select(TITLE_BADGE_SELECTOR):
+            badge.decompose()
+
         link = _select_first(row, site.title_link_selector)
         if not link:
             continue
