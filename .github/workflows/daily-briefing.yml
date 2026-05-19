@@ -2,14 +2,14 @@ name: Daily Immigration Policy Briefing
 
 on:
   schedule:
-    # 윈도우 종료는 KST 08:30 — 트리거 시각을 윈도우 종료에 맞춤.
-    # GitHub Actions 무료 cron 은 평균 ~3시간 24분 지연되므로,
-    # cron 트리거 KST 08:30 (UTC 23:30 전일) → 실제 실행 ~KST 11:54 → 발송 ~KST 12:00 ± 30분.
-    # 윈도우: [어제 08:30 KST, 오늘 08:30 KST). 게시일 ≤ 당일 08:30 KST 필터.
+    # 윈도우 종료는 KST 07:00 — 트리거 시각을 윈도우 종료에 맞춤.
+    # GitHub Actions 무료 cron 은 평균 ~25분 지연되므로 (이 리포 22:30 UTC cron 과거 데이터 기준),
+    # cron 트리거 KST 07:00 (UTC 22:00 전일) → 실제 실행 ~KST 07:25 → 발송 ~KST 07:30, 늦어도 KST 09:30 이전.
+    # 윈도우: [어제 07:00 KST, 오늘 07:00 KST). 게시일 ≤ 당일 07:00 KST 필터.
     # 주의: WINDOW_END_HOUR/MINUTE 와 트리거 시각은 동기화 필요 — compute_window 가
     # `end > now` 일 때 윈도우를 하루 뒤로 미는 분기를 갖고 있어, 트리거가 윈도우 종료보다
     # 앞서 정시 발사되면 잘못된 날짜를 발송하게 됨.
-    - cron: "30 23 * * *"
+    - cron: "0 22 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -70,8 +70,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
           WINDOW_HOURS: ${{ vars.WINDOW_HOURS || '24' }}
-          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '8' }}
-          WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '30' }}
+          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '7' }}
+          WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '0' }}
           ISSUE_KEEP_DAYS: ${{ vars.ISSUE_KEEP_DAYS || '30' }}
           # 이메일 채널: GitHub Issue 경유가 아닌 SMTP 로 직접 발송 → 수신자 입장에서 GitHub 흔적 0.
           # 레거시 운영과 동일한 secret 명 재사용 (EMAIL_SENDER/EMAIL_PASSWORD/EMAIL_RECEIVER).
