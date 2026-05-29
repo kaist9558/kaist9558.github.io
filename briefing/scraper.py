@@ -205,14 +205,14 @@ def fetch_articles(session, site: Site, *, max_rows: int = 15, js_renderer=None)
             return result
         return _parse_list(list_html, site, max_rows, fetch_detail=js_renderer.fetch)
 
-    res = get(session, site.list_url, encoding=site.encoding)
+    res = get(session, site.list_url, encoding=site.encoding, verify=site.verify_ssl)
     if res is None:
         result = ScrapeResult()
         result.errors.append((site.name, "목록 페이지 접속 실패 (네트워크 또는 5xx)"))
         return result
 
     def static_detail(url: str) -> Optional[str]:
-        d = get(session, url, encoding=site.encoding)
+        d = get(session, url, encoding=site.encoding, verify=site.verify_ssl)
         return d.text if d is not None else None
 
     return _parse_list(res.text, site, max_rows, fetch_detail=static_detail)
