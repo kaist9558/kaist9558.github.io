@@ -83,6 +83,10 @@ class Site:
     # AJAX 로 행 데이터가 채워지는 사이트 — Playwright 가 이 selector 가 비어있지 않을
     # 때까지 추가 대기.
     wait_selector: str | None = None
+    # KDI EIEC 등 일부 정부 사이트는 서버가 intermediate cert 를 같이 내려주지 않아
+    # requests 의 기본 CA 번들 검증에 실패한다(브라우저는 AIA fetching 으로 해결).
+    # 콘텐츠 무결성만 신뢰 경계인 공개 읽기 전용 사이트에 한해 False 로 둠.
+    verify_ssl: bool = True
 
 
 # 신규 보도자료/공지 수집 소스 5곳:
@@ -150,6 +154,7 @@ SITES: tuple[Site, ...] = (
         title_selector="div.list_txt p",
         date_selector="div.list_txt span:nth-of-type(2)",
         detail_content_selector="div.view_body, div.view_comm_style",
+        verify_ssl=False,
     ),
     Site(
         # KDI EIEC '국내자료' — 국내 연구기관 보고서/이슈페이퍼 큐레이션.
@@ -162,6 +167,7 @@ SITES: tuple[Site, ...] = (
         title_selector="div.list_txt p",
         date_selector="div.list_txt span:nth-of-type(2)",
         detail_content_selector="div.view_body, div.view_comm_style",
+        verify_ssl=False,
     ),
 )
 
