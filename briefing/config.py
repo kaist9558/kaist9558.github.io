@@ -85,12 +85,15 @@ class Site:
     wait_selector: str | None = None
 
 
-# 신규 보도자료/공지 수집 소스 3곳:
+# 신규 보도자료/공지 수집 소스 5곳:
 #   1) 법무부 보도자료                       : moj.go.kr/moj/221      (정부 통합 CMS)
 #   2) 출입국·외국인정책본부 보도자료         : immigration.go.kr/.../1502 (정부 통합 CMS)
 #   3) 하이코리아 공지사항                    : hikorea.go.kr/.../BoardNtcListR.pt (자체 게시판)
+#   4) KDI 경제정보센터 정책자료              : eiec.kdi.re.kr/policy/materialList.do
+#   5) KDI 경제정보센터 국내자료              : eiec.kdi.re.kr/policy/domesticList.do
 # (1)(2) 공통 셀렉터: artclLinkView / _artclTd* / _articleTable
 # (3) 별도 셀렉터: tr.board_line + onclick="boardDetailR('NNN')" → view URL 직접 구성.
+# (4)(5) 공통 셀렉터: ul.policy_material_list > li, 상대경로 ./xxxView.do?... → base_url 끝의 /policy/ 가 urljoin 기준.
 # TRACKED_PAGES 의 '체류자격별 통합 안내 매뉴얼(최신)' 단일 글 추적은 별도 채널(🔔 섹션).
 # 셀렉터는 사이트 진단 결과(`python -m briefing.diagnose`) 기반으로 보정 가능.
 SITES: tuple[Site, ...] = (
@@ -130,6 +133,35 @@ SITES: tuple[Site, ...] = (
             "https://www.hikorea.go.kr/board/BoardNtcDetailR.pt?"
             "BBS_SEQ=1&BBS_GB_CD=BS10&NTCCTT_SEQ={id}&page=1"
         ),
+    ),
+    Site(
+        # 정부 부처·연구기관 정책자료 큐레이션. 이민·비자 키워드 필터 통과한 글만 채택.
+        name="KDI 정책자료",
+        list_url="https://eiec.kdi.re.kr/policy/materialList.do",
+        # 상대경로 ./materialView.do?... 를 /policy/ 기준으로 풀려면 base_url 이 /policy 까지 가야 함.
+        # scraper 가 base_url + "/" 로 urljoin 하므로 끝에 슬래시 불필요.
+        base_url="https://eiec.kdi.re.kr/policy",
+        # 행: <ul class="policy_material_list"> > <li>.
+        # 링크: <a href="./materialView.do?num=...">. onclick 없는 정적 링크.
+        # 제목: <a> 안에 publisher/date span 까지 함께 들어있으므로 별도 title_selector 로 <p> 만 추출.
+        # 날짜: list_txt 의 두 번째 span (첫 번째는 발행기관). 텍스트 형식 "YYYY.MM.DD Np".
+        row_selector="ul.policy_material_list > li",
+        title_link_selector="a",
+        title_selector="div.list_txt p",
+        date_selector="div.list_txt span:nth-of-type(2)",
+        detail_content_selector="div.view_body, div.view_comm_style",
+    ),
+    Site(
+        # KDI EIEC '국내자료' — 국내 연구기관 보고서/이슈페이퍼 큐레이션.
+        # 정책자료와 HTML 구조 동일, 링크만 ./domesticView.do?ac=... 로 다름.
+        name="KDI 국내자료",
+        list_url="https://eiec.kdi.re.kr/policy/domesticList.do",
+        base_url="https://eiec.kdi.re.kr/policy",
+        row_selector="ul.policy_material_list > li",
+        title_link_selector="a",
+        title_selector="div.list_txt p",
+        date_selector="div.list_txt span:nth-of-type(2)",
+        detail_content_selector="div.view_body, div.view_comm_style",
     ),
 )
 
