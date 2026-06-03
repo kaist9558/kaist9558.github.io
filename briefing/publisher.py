@@ -154,14 +154,8 @@ def render_markdown(
                 lines.append("> (첨부 파일 메타 추출 실패 — 페이지 직접 확인 권장)")
             lines.append("")
 
-    if scrape_errors:
-        lines.append("---")
-        lines.append("")
-        lines.append("## ⚠️ 모니터링 경고")
-        lines.append("")
-        for site, msg in scrape_errors:
-            lines.append(f"- **{site}**: {msg}")
-        lines.append("")
+    # 모니터링 경고 섹션은 사용자 요청으로 메일/브리핑 본문에서 숨김 처리.
+    # (스크레이프 에러는 액션 로그에만 남고 수신자에게는 노출하지 않음)
 
     return title, "\n".join(lines).rstrip() + "\n"
 
