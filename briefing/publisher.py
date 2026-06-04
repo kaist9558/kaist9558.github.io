@@ -7,7 +7,7 @@ from datetime import datetime
 
 import requests
 
-from .config import KST, SITES, TRACKED_PAGES
+from .config import KEYWORDS, KST, SITES, TRACKED_PAGES
 
 log = logging.getLogger(__name__)
 
@@ -156,6 +156,17 @@ def render_markdown(
 
     # 모니터링 경고 섹션은 사용자 요청으로 메일/브리핑 본문에서 숨김 처리.
     # (스크레이프 에러는 액션 로그에만 남고 수신자에게는 노출하지 않음)
+
+    # 본문 하단: 어떤 키워드로 글을 센싱하는지 간단 안내.
+    # config.KEYWORDS 와 자동 동기화되므로 키워드 추가/삭제 시 함께 갱신됨.
+    lines.append("---")
+    lines.append("")
+    lines.append("## 🔎 센싱 키워드")
+    lines.append("")
+    lines.append("아래 키워드가 제목·본문에 포함된 정부·기관 게시물을 자동으로 수집·요약합니다.")
+    lines.append("")
+    lines.append("> " + " · ".join(KEYWORDS))
+    lines.append("")
 
     return title, "\n".join(lines).rstrip() + "\n"
 
