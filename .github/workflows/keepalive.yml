@@ -1,0 +1,40 @@
+name: Keep workflows alive
+
+# 목적: 저장소에 60일 이상 커밋이 없으면 GitHub이 스케줄 워크플로우를 자동으로
+# `disabled_inactivity` 상태로 정지시킴. 이걸 방지하기 위해 20일마다 사소한
+# timestamp 파일을 갱신·commit·push 하여 저장소 활동 카운터를 리셋한다.
+#
+# 자기 자신도 스케줄 워크플로우이므로 정지 대상이지만, 매 20일마다 커밋을 만들어
+# 자신의 60일 카운터도 함께 리셋되므로 무한히 살아있음.
+
+on:
+  schedule:
+    # 매월 1일·21일 05:30 UTC (KST 14:30). 60일 이내 최소 2회 실행 보장.
+    - cron: "30 5 1,21 * *"
+  workflow_dispatch:
+
+jobs:
+  bump-keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # push할 때 default GITHUB_TOKEN 이 대신 사용됨.
+          persist-credentials: true
+
+      - name: Bump keepalive timestamp
+        run: |
+          mkdir -p .github
+          date -u +"%Y-%m-%dT%H:%M:%SZ  # auto-bumped to keep scheduled workflows alive" > .github/keepalive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive.txt
+          if git diff --cached --quiet; then
+            echo "No change (unexpected — timestamp should always differ). Skipping."
+            exit 0
+          fi
+          git commit -m "chore: keepalive bump $(date -u +%Y-%m-%d)"
+          git push origin HEAD:main
