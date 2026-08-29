@@ -2,17 +2,21 @@ name: Daily Immigration Policy Briefing
 
 on:
   schedule:
-    # 수신자가 "아침 8~9시" 도착을 요구. 실측 지연 파이프라인:
-    #   1) GitHub Actions cron 지연 ~60분 (이 리포 실 데이터: 07:00 KST 예약 → 07:55~08:15 KST 시작)
-    #   2) 워크플로우 실행 ~5분
-    #   3) 수신 측 메일 서버 SMTP 지연 ~3시간 (KAIST 조직 메일 스캐너/큐 추정)
-    # 총 ~4시간 파이프라인 → 8~9 AM 도착 위해 cron 을 KST 05:00 으로 설정.
-    #   KST 05:00 cron (UTC 20:00 전일) → 실제 실행 ~05:55 → 발송 ~06:00 → 도착 ~08:00~09:00 KST.
-    # 윈도우: [어제 05:00 KST, 오늘 05:00 KST). 게시일 ≤ 당일 05:00 KST 필터.
+    # 수신자가 "아침 8~9시" 도착을 요구.
+    # 최근 실 데이터가 보여준 사실:
+    #   - SMTP 지연은 거의 0 (워크플로우 완료 = 수신 시각)
+    #   - 100% 는 GitHub Actions 무료 티어 cron 지연이며, 편차 극단적
+    #     (관측: 10분 ~ 6시간 45분, 같은 크론 예약임에도 매일 다름)
+    #   - 이건 GitHub 의 free tier best-effort SLA 한계 — 우리 쪽에서 못 줄임
+    # 대응: 최악 지연(약 7시간)에도 09:00 이전 도착 보장 위해 cron 을 KST 01:00 으로.
+    #   빠른 날: 실행 01:15 도착 (사용자 취침 중 — 무해)
+    #   중간 날: 실행 05:00 도착 (이른 아침 — 무해)
+    #   느린 날: 실행 08:00 도착 ✅ 타깃 진입
+    # 윈도우: [어제 01:00 KST, 오늘 01:00 KST). 게시일 ≤ 당일 01:00 KST 필터.
     # 주의: WINDOW_END_HOUR/MINUTE 와 트리거 시각은 동기화 필요 — compute_window 가
     # `end > now` 일 때 윈도우를 하루 뒤로 미는 분기를 갖고 있어, 트리거가 윈도우 종료보다
     # 앞서 정시 발사되면 잘못된 날짜를 발송하게 됨.
-    - cron: "0 20 * * *"
+    - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -73,7 +77,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL || 'claude-sonnet-4-6' }}
           WINDOW_HOURS: ${{ vars.WINDOW_HOURS || '24' }}
-          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '5' }}
+          WINDOW_END_HOUR_KST: ${{ vars.WINDOW_END_HOUR_KST || '1' }}
           WINDOW_END_MINUTE_KST: ${{ vars.WINDOW_END_MINUTE_KST || '0' }}
           ISSUE_KEEP_DAYS: ${{ vars.ISSUE_KEEP_DAYS || '30' }}
           # 이메일 채널: GitHub Issue 경유가 아닌 SMTP 로 직접 발송 → 수신자 입장에서 GitHub 흔적 0.
